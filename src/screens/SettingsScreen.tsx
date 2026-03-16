@@ -49,7 +49,7 @@ function SectionHeader({ title }: { title: string }) {
 }
 
 const PRIVACY_POLICY_URL = "https://chooch1802.github.io/RATPAC/docs/privacy-policy.html";
-const TERMS_URL = "https://chooch1802.github.io/RATPAC/docs/privacy-policy.html";
+const TERMS_URL = "https://chooch1802.github.io/RATPAC/docs/terms.html";
 const HELP_EMAIL = "mailto:support@ratpac.app";
 
 export default function SettingsScreen({ navigation }: { navigation: any }) {

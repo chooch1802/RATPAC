@@ -307,14 +307,14 @@ export default function OnboardingScreen() {
               I confirm I am 18 or older and agree to the{" "}
               <Text
                 style={styles.termsLink}
-                onPress={() => Linking.openURL("https://ratpac.app/terms")}
+                onPress={() => Linking.openURL("https://chooch1802.github.io/RATPAC/docs/terms.html")}
               >
                 Terms of Service
               </Text>
               {" "}and{" "}
               <Text
                 style={styles.termsLink}
-                onPress={() => Linking.openURL("https://ratpac.app/privacy")}
+                onPress={() => Linking.openURL("https://chooch1802.github.io/RATPAC/docs/privacy-policy.html")}
               >
                 Privacy Policy
               </Text>

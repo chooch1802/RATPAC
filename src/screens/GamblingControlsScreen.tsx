@@ -213,12 +213,22 @@ export default function GamblingControlsScreen({ navigation }: { navigation: any
           )}
         </View>
 
+        {/* No-funds disclaimer */}
+        <View style={styles.disclaimerBox}>
+          <Text style={styles.disclaimerText}>
+            Ratpac does not hold or process any funds. All payments are made peer-to-peer between users outside the app.
+          </Text>
+        </View>
+
         {/* Help */}
         <View style={styles.helpBox}>
+          <Text style={styles.helpTitle}>Need help?</Text>
           <Text style={styles.helpText}>
-            If you are concerned about your gambling, free help is available at{" "}
-            <Text style={styles.helpLink}>www.gamblinghelponline.org.au</Text>
-            {" "}or call 1800 858 858.
+            Free, confidential support is available 24/7:{"\n"}
+            {"🇦🇺 "}Gambling Help Online — 1800 858 858{"\n"}
+            {"🇺🇸 "}National Helpline — 1-800-522-4700{"\n"}
+            {"🇬🇧 "}GamCare — 0808 8020 133{"\n"}
+            {"🌐 "}gamblingtherapy.org
           </Text>
         </View>
 
@@ -323,13 +333,27 @@ const styles = StyleSheet.create({
   exclusionLabel: { color: theme.colors.destructive, fontSize: 15, fontWeight: "500" },
   excludedNote: { padding: 16 },
   excludedNoteText: { color: theme.colors.textMuted, fontSize: 13, lineHeight: 18 },
+  // Disclaimer
+  disclaimerBox: {
+    marginTop: 24,
+    backgroundColor: `${theme.colors.accent}12`,
+    borderWidth: 1, borderColor: `${theme.colors.accent}30`,
+    borderRadius: 12, padding: 14,
+  },
+  disclaimerText: {
+    color: theme.colors.textSecondary,
+    fontSize: 12, lineHeight: 18, textAlign: "center",
+  },
   // Help
   helpBox: {
-    marginTop: 24, padding: 16,
+    marginTop: 12, padding: 16,
     backgroundColor: theme.colors.bgSecondary,
     borderWidth: 1, borderColor: theme.colors.border,
     borderRadius: 12,
   },
-  helpText: { color: theme.colors.textMuted, fontSize: 12, lineHeight: 18, textAlign: "center" },
-  helpLink: { color: theme.colors.accent, fontWeight: "600" },
+  helpTitle: {
+    color: theme.colors.textPrimary, fontSize: 13,
+    fontWeight: "700", marginBottom: 8, textAlign: "center",
+  },
+  helpText: { color: theme.colors.textMuted, fontSize: 12, lineHeight: 20 },
 });
