@@ -106,7 +106,7 @@ export async function updateProfile(
 
 export async function redeemReferralCode(
   code: string
-): Promise<{ ok: boolean; message: string; freeMonths?: number }> {
+): Promise<{ ok: boolean; message: string; discountWeeks?: number; appleOfferId?: string }> {
   if (!supabase) return { ok: false, message: "Not configured." };
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { ok: false, message: "Not signed in." };
@@ -116,13 +116,14 @@ export async function redeemReferralCode(
     p_user_id: user.id,
   });
 
-  if (error || !data?.ok) return { ok: false, message: "Invalid code." };
-  return { ok: true, message: `${data.free_months} month${data.free_months > 1 ? "s" : ""} free unlocked!`, freeMonths: data.free_months };
-}
+  if (error || !data?.ok) return { ok: false, message: data?.message ?? "Invalid code." };
 
-export async function checkAndExpireTrials(): Promise<void> {
-  if (!supabase) return;
-  await supabase.rpc("expire_trials");
+  const weeks: number = data.discount_weeks ?? 1;
+  const msg = weeks === 1
+    ? "Code applied! You'll get 1 free week."
+    : `Code applied! You'll get ${weeks} free weeks.`;
+
+  return { ok: true, message: msg, discountWeeks: weeks, appleOfferId: data.apple_offer_id ?? undefined };
 }
 
 export async function sendPhoneOtp(phone: string): Promise<AuthResult> {
