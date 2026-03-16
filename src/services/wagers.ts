@@ -21,6 +21,7 @@ function rowToWager(row: any): Wager {
     opponentDisplayName: row.opponent?.display_name ?? row.opponent_handle ?? "Unknown",
     status: row.status ?? "PENDING",
     winnerHandle: row.winner_handle ?? undefined,
+    declarerHandle: row.declarer_handle ?? undefined,
     termsText: row.terms_text ?? undefined,
     paymentMethod: row.payment_method ?? undefined,
     paymentHandle: row.payment_handle ?? undefined,
@@ -28,17 +29,19 @@ function rowToWager(row: any): Wager {
   };
 }
 
-async function fetchWagerById(wagerId: string): Promise<Wager | null> {
+const WAGER_SELECT = `
+  id, activity, amount, status, created_at,
+  opponent_handle, terms_text, winner_handle, declarer_handle,
+  payment_method, payment_handle,
+  opponent:profiles!wagers_opponent_id_fkey(display_name, handle)
+`;
+
+export async function fetchWagerById(wagerId: string): Promise<Wager | null> {
   if (!supabase) return null;
 
   const { data, error } = await supabase
     .from("wagers")
-    .select(`
-      id, activity, amount, status, created_at,
-      opponent_handle, terms_text, winner_handle,
-      payment_method, payment_handle,
-      opponent:profiles!wagers_opponent_id_fkey(display_name, handle)
-    `)
+    .select(WAGER_SELECT)
     .eq("id", wagerId)
     .maybeSingle();
 
@@ -88,12 +91,7 @@ export async function loadInitialData(): Promise<{ feed: FeedPost[]; wagers: Wag
   const [wagersRes, postsRes] = await Promise.all([
     supabase
       .from("wagers")
-      .select(`
-        id, activity, amount, status, created_at,
-        opponent_handle, terms_text, winner_handle,
-        payment_method, payment_handle,
-        opponent:profiles!wagers_opponent_id_fkey(display_name, handle)
-      `)
+      .select(WAGER_SELECT)
       .or(`creator_id.eq.${user.id},opponent_id.eq.${user.id}`)
       .order("created_at", { ascending: false })
       .limit(50),
@@ -221,15 +219,175 @@ export async function createWagerRecord(input: CreateWagerInput): Promise<Wager>
   };
 }
 
+/** Step 1: Declare a result — transitions ACTIVE → AWAITING_RESULT */
+export async function declareWagerResult(
+  wagerId: string,
+  winnerHandle: string
+): Promise<{ ok: boolean }> {
+  if (!supabase) return { ok: false };
+  const client = supabase;
+
+  const { data: { user } } = await client.auth.getUser();
+  if (!user) return { ok: false };
+
+  const { data: me } = await client
+    .from("profiles")
+    .select("handle, display_name")
+    .eq("id", user.id)
+    .maybeSingle();
+
+  const { data: wager, error: wagerErr } = await client
+    .from("wagers")
+    .select("id, creator_id, opponent_id, activity, amount")
+    .eq("id", wagerId)
+    .maybeSingle();
+
+  if (wagerErr || !wager) return { ok: false };
+
+  const { error } = await client
+    .from("wagers")
+    .update({
+      status: "AWAITING_RESULT",
+      winner_handle: winnerHandle,
+      declarer_handle: me?.handle ?? null,
+    })
+    .eq("id", wagerId)
+    .eq("status", "ACTIVE");
+
+  if (error) return { ok: false };
+
+  // Notify the other party
+  const otherPartyId = wager.creator_id === user.id ? wager.opponent_id : wager.creator_id;
+  if (otherPartyId) {
+    const declarer = me?.display_name ?? me?.handle ?? "Your opponent";
+    await client.from("notifications").insert({
+      user_id: otherPartyId,
+      type: "RESULT_CONFIRM_REQUEST",
+      title: "Result declared",
+      body: `${declarer} declared a result for your ${wager.activity} wager — confirm or dispute.`,
+      reference_id: wagerId,
+    });
+  }
+
+  return { ok: true };
+}
+
+/** Step 2a: Confirm the declared result — transitions AWAITING_RESULT → SETTLED */
+export async function confirmWagerResult(wagerId: string): Promise<{ ok: boolean }> {
+  if (!supabase) return { ok: false };
+  const client = supabase;
+
+  const { data: { user } } = await client.auth.getUser();
+  if (!user) return { ok: false };
+
+  // Fetch wager to get winner handle and resolve winner_id
+  const { data: wager, error: wagerErr } = await client
+    .from("wagers")
+    .select("id, creator_id, opponent_id, winner_handle, activity, amount, declarer_handle, status")
+    .eq("id", wagerId)
+    .maybeSingle();
+
+  if (wagerErr || !wager || wager.status === "SETTLED") return { ok: false };
+
+  // Look up winner UUID from handle
+  let winnerId: string | null = null;
+  if (wager.winner_handle) {
+    const { data: winnerProfile } = await client
+      .from("profiles")
+      .select("id")
+      .eq("handle", wager.winner_handle)
+      .maybeSingle();
+    winnerId = winnerProfile?.id ?? null;
+  }
+
+  const { error } = await client
+    .from("wagers")
+    .update({ status: "SETTLED", winner_id: winnerId })
+    .eq("id", wagerId)
+    .eq("status", "AWAITING_RESULT");
+
+  if (error) return { ok: false };
+
+  // Notify the declarer (the other party)
+  const declarerId = wager.creator_id === user.id ? wager.opponent_id : wager.creator_id;
+  if (declarerId) {
+    const isWinner = winnerId === declarerId || wager.winner_handle === wager.declarer_handle;
+    await client.from("notifications").insert({
+      user_id: declarerId,
+      type: isWinner ? "WAGER_SETTLED_WIN" : "WAGER_SETTLED_LOSS",
+      title: isWinner ? "Wager settled — you won!" : "Wager settled",
+      body: `Your ${wager.activity} wager has been confirmed and settled.`,
+      reference_id: wagerId,
+    });
+  }
+
+  return { ok: true };
+}
+
+/** Step 2b: Dispute the declared result — transitions AWAITING_RESULT → DISPUTED */
+export async function disputeWagerResult(wagerId: string): Promise<{ ok: boolean }> {
+  if (!supabase) return { ok: false };
+  const client = supabase;
+
+  const { data: { user } } = await client.auth.getUser();
+  if (!user) return { ok: false };
+
+  const { data: me } = await client
+    .from("profiles")
+    .select("handle, display_name")
+    .eq("id", user.id)
+    .maybeSingle();
+
+  const { data: wager, error: wagerErr } = await client
+    .from("wagers")
+    .select("id, creator_id, opponent_id, activity")
+    .eq("id", wagerId)
+    .maybeSingle();
+
+  if (wagerErr || !wager) return { ok: false };
+
+  const { error } = await client
+    .from("wagers")
+    .update({ status: "DISPUTED" })
+    .eq("id", wagerId)
+    .eq("status", "AWAITING_RESULT");
+
+  if (error) return { ok: false };
+
+  // Notify both parties
+  const otherPartyId = wager.creator_id === user.id ? wager.opponent_id : wager.creator_id;
+  const disputer = me?.display_name ?? me?.handle ?? "Your opponent";
+  if (otherPartyId) {
+    await client.from("notifications").insert({
+      user_id: otherPartyId,
+      type: "RESULT_DISPUTED",
+      title: "Result disputed",
+      body: `${disputer} disputed the result for your ${wager.activity} wager. Reach out to resolve.`,
+      reference_id: wagerId,
+    });
+  }
+
+  return { ok: true };
+}
+
+/** Legacy single-step settle (kept for backward compatibility) */
 export async function settleWager(
   wagerId: string,
   winnerHandle: string
 ): Promise<{ ok: boolean }> {
   if (!supabase) return { ok: false };
+  const client = supabase;
 
-  const { error } = await supabase
+  // Resolve winner UUID
+  const { data: winnerProfile } = await client
+    .from("profiles")
+    .select("id")
+    .eq("handle", winnerHandle)
+    .maybeSingle();
+
+  const { error } = await client
     .from("wagers")
-    .update({ status: "SETTLED", winner_handle: winnerHandle })
+    .update({ status: "SETTLED", winner_handle: winnerHandle, winner_id: winnerProfile?.id ?? null })
     .eq("id", wagerId);
 
   return { ok: !error };

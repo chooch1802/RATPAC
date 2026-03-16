@@ -70,6 +70,7 @@ create table if not exists wagers (
   status          wager_status not null default 'PENDING',
   winner_id       uuid references profiles(id) on delete set null,
   winner_handle   text,
+  declarer_handle text,
   payment_method  payment_method,
   payment_handle  text,
   is_public       boolean not null default true,

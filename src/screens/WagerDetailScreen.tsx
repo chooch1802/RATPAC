@@ -1,5 +1,6 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
+  ActivityIndicator,
   Linking,
   Pressable,
   SafeAreaView,
@@ -8,6 +9,7 @@ import {
   Text,
   View,
 } from "react-native";
+import { fetchWagerById } from "../services/wagers";
 import { useAppStore } from "../store/useAppStore";
 import { theme } from "../theme";
 import { PaymentMethod, Wager, WagerStatus } from "../types";
@@ -93,14 +95,43 @@ export default function WagerDetailScreen({
 }) {
   const wagerId: string = route.params?.wagerId;
   const wagers = useAppStore((s) => s.wagers);
+  const upsertWager = useAppStore((s) => s.upsertWager);
   const user = useAppStore((s) => s.user);
-  const markWagerSettled = useAppStore((s) => s.markWagerSettled);
   const respondToChallenge = useAppStore((s) => s.respondToChallenge);
+  const declareResult = useAppStore((s) => s.declareResult);
+  const confirmResult = useAppStore((s) => s.confirmResult);
+  const disputeResult = useAppStore((s) => s.disputeResult);
+
   const [challengeActionLoading, setChallengeActionLoading] = useState<
     "" | "accept" | "decline"
   >("");
+  const [resultActionLoading, setResultActionLoading] = useState<
+    "" | "won" | "lost" | "confirm" | "dispute"
+  >("");
+  const [isFetching, setIsFetching] = useState(false);
 
-  const wager = wagers.find((w) => w.id === wagerId);
+  const storeWager = wagers.find((w) => w.id === wagerId);
+
+  // Fetch from backend if not in local store (e.g. navigated from a push notification)
+  useEffect(() => {
+    if (!storeWager && wagerId) {
+      setIsFetching(true);
+      fetchWagerById(wagerId).then((fetched) => {
+        if (fetched) upsertWager(fetched);
+        setIsFetching(false);
+      });
+    }
+  }, [wagerId, storeWager]);
+
+  const wager = storeWager ?? null;
+
+  if (isFetching) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <ActivityIndicator color={theme.colors.accent} style={{ marginTop: 60 }} />
+      </SafeAreaView>
+    );
+  }
 
   if (!wager) {
     return (
@@ -112,15 +143,29 @@ export default function WagerDetailScreen({
 
   const config = STATUS_CONFIG[wager.status] ?? STATUS_CONFIG.PENDING;
   const isWin = wager.status === "SETTLED" && wager.winnerHandle === user.handle;
-  const isLoss = wager.status === "SETTLED" && wager.winnerHandle && wager.winnerHandle !== user.handle;
+  const isLoss = wager.status === "SETTLED" && wager.winnerHandle != null && wager.winnerHandle !== user.handle;
   const isChallengeToMe =
     wager.status === "PENDING" && wager.opponentHandle === user.handle;
   const isPendingOutgoing =
     wager.status === "PENDING" && wager.opponentHandle !== user.handle;
+
+  // Two-step settlement helpers
+  const isAwaitingResult = wager.status === "AWAITING_RESULT";
+  const iDeclared = isAwaitingResult && wager.declarerHandle === user.handle;
+  const opponentShouldConfirm = isAwaitingResult && !iDeclared;
+  const declaredWinnerName =
+    wager.winnerHandle === user.handle
+      ? "you"
+      : wager.opponentDisplayName ?? wager.opponentHandle;
+
   const statusDescription = isChallengeToMe
     ? "This challenge is waiting on your response."
     : isPendingOutgoing
     ? "Waiting for your opponent to accept the challenge."
+    : iDeclared
+    ? `You declared ${declaredWinnerName} the winner. Waiting for confirmation.`
+    : opponentShouldConfirm
+    ? `${wager.declarerHandle ?? "Your opponent"} declared ${declaredWinnerName} the winner. Confirm or dispute.`
     : config.desc;
 
   return (
@@ -222,15 +267,12 @@ export default function WagerDetailScreen({
           )}
         </View>
 
-        {/* Mark result for active wagers */}
+        {/* Accept / decline an incoming challenge */}
         {isChallengeToMe && (
           <View style={styles.actionsCard}>
-            <Text style={styles.actionsTitle}>Challenge Action</Text>
+            <Text style={styles.actionsTitle}>Challenge Response</Text>
             <Pressable
-              style={[
-                styles.confirmBtn,
-                challengeActionLoading.length > 0 && styles.actionBtnDisabled,
-              ]}
+              style={[styles.confirmBtn, challengeActionLoading.length > 0 && styles.actionBtnDisabled]}
               disabled={challengeActionLoading.length > 0}
               onPress={async () => {
                 setChallengeActionLoading("accept");
@@ -238,13 +280,12 @@ export default function WagerDetailScreen({
                 setChallengeActionLoading("");
               }}
             >
-              <Text style={styles.confirmBtnText}>Accept Challenge</Text>
+              <Text style={styles.confirmBtnText}>
+                {challengeActionLoading === "accept" ? "Accepting…" : "Accept Challenge"}
+              </Text>
             </Pressable>
             <Pressable
-              style={[
-                styles.disputeBtn,
-                challengeActionLoading.length > 0 && styles.actionBtnDisabled,
-              ]}
+              style={[styles.disputeBtn, challengeActionLoading.length > 0 && styles.actionBtnDisabled]}
               disabled={challengeActionLoading.length > 0}
               onPress={async () => {
                 setChallengeActionLoading("decline");
@@ -252,27 +293,94 @@ export default function WagerDetailScreen({
                 setChallengeActionLoading("");
               }}
             >
-              <Text style={styles.disputeBtnText}>Decline Challenge</Text>
+              <Text style={styles.disputeBtnText}>
+                {challengeActionLoading === "decline" ? "Declining…" : "Decline"}
+              </Text>
             </Pressable>
           </View>
         )}
 
-        {/* Mark result for active wagers */}
+        {/* Step 1: Declare result for active wagers */}
         {wager.status === "ACTIVE" && (
           <View style={styles.actionsCard}>
-            <Text style={styles.actionsTitle}>Mark Result</Text>
+            <Text style={styles.actionsTitle}>Declare Result</Text>
+            <Text style={styles.actionsSubtitle}>
+              Your opponent will be notified and asked to confirm.
+            </Text>
             <Pressable
-              style={styles.confirmBtn}
-              onPress={() => markWagerSettled(wager.id, user.handle)}
+              style={[styles.confirmBtn, resultActionLoading.length > 0 && styles.actionBtnDisabled]}
+              disabled={resultActionLoading.length > 0}
+              onPress={async () => {
+                setResultActionLoading("won");
+                await declareResult(wager.id, user.handle);
+                setResultActionLoading("");
+              }}
             >
-              <Text style={styles.confirmBtnText}>I Won</Text>
+              <Text style={styles.confirmBtnText}>
+                {resultActionLoading === "won" ? "Declaring…" : "I Won"}
+              </Text>
             </Pressable>
             <Pressable
-              style={styles.disputeBtn}
-              onPress={() => markWagerSettled(wager.id, wager.opponentHandle)}
+              style={[styles.disputeBtn, resultActionLoading.length > 0 && styles.actionBtnDisabled]}
+              disabled={resultActionLoading.length > 0}
+              onPress={async () => {
+                setResultActionLoading("lost");
+                await declareResult(wager.id, wager.opponentHandle);
+                setResultActionLoading("");
+              }}
             >
-              <Text style={styles.disputeBtnText}>I Lost</Text>
+              <Text style={styles.disputeBtnText}>
+                {resultActionLoading === "lost" ? "Declaring…" : "I Lost"}
+              </Text>
             </Pressable>
+          </View>
+        )}
+
+        {/* Step 2: Confirm or dispute a declared result */}
+        {opponentShouldConfirm && (
+          <View style={styles.actionsCard}>
+            <Text style={styles.actionsTitle}>Confirm Result</Text>
+            <Text style={styles.actionsSubtitle}>
+              {wager.declarerHandle ?? "Your opponent"} declared {declaredWinnerName} the winner.
+              Do you agree?
+            </Text>
+            <Pressable
+              style={[styles.confirmBtn, resultActionLoading.length > 0 && styles.actionBtnDisabled]}
+              disabled={resultActionLoading.length > 0}
+              onPress={async () => {
+                setResultActionLoading("confirm");
+                await confirmResult(wager.id);
+                setResultActionLoading("");
+              }}
+            >
+              <Text style={styles.confirmBtnText}>
+                {resultActionLoading === "confirm" ? "Confirming…" : "Confirm — That's Right"}
+              </Text>
+            </Pressable>
+            <Pressable
+              style={[styles.disputeBtn, resultActionLoading.length > 0 && styles.actionBtnDisabled]}
+              disabled={resultActionLoading.length > 0}
+              onPress={async () => {
+                setResultActionLoading("dispute");
+                await disputeResult(wager.id);
+                setResultActionLoading("");
+              }}
+            >
+              <Text style={styles.disputeBtnText}>
+                {resultActionLoading === "dispute" ? "Disputing…" : "Dispute Result"}
+              </Text>
+            </Pressable>
+          </View>
+        )}
+
+        {/* Waiting state — you declared, pending confirmation */}
+        {iDeclared && (
+          <View style={[styles.actionsCard, { alignItems: "center" }]}>
+            <ActivityIndicator color={theme.colors.accent} style={{ marginBottom: 8 }} />
+            <Text style={styles.actionsTitle}>Waiting for Confirmation</Text>
+            <Text style={styles.actionsSubtitle}>
+              Your opponent has been notified and needs to confirm the result.
+            </Text>
           </View>
         )}
 
@@ -520,6 +628,12 @@ const styles = StyleSheet.create({
     color: theme.colors.textPrimary,
     fontWeight: "700",
     fontSize: 15,
+    marginBottom: 4,
+  },
+  actionsSubtitle: {
+    color: theme.colors.textMuted,
+    fontSize: 13,
+    lineHeight: 18,
     marginBottom: 4,
   },
   confirmBtn: {

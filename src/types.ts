@@ -44,6 +44,7 @@ export type Wager = {
   opponentDisplayName?: string;
   status: WagerStatus;
   winnerHandle?: string;
+  declarerHandle?: string;
   termsText?: string;
   createdAt?: string;
   paymentMethod?: PaymentMethod;

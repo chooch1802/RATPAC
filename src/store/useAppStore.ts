@@ -5,6 +5,9 @@ import { followUserByHandle, loadFollowingHandles, unfollowUserByHandle } from "
 import { fetchSubscriptionStatus } from "../services/subscription";
 import {
   createWagerRecord,
+  declareWagerResult,
+  confirmWagerResult,
+  disputeWagerResult,
   loadInitialData,
   loadNotifications,
   loadPublicFeed,
@@ -77,6 +80,9 @@ type AppState = {
   setCreateWagerVisible: (next: boolean) => void;
   createWager: (payload: CreateWagerPayload) => Promise<void>;
   markWagerSettled: (wagerId: string, winnerHandle: string) => Promise<void>;
+  declareResult: (wagerId: string, winnerHandle: string) => Promise<void>;
+  confirmResult: (wagerId: string) => Promise<void>;
+  disputeResult: (wagerId: string) => Promise<void>;
   hydrateFromBackend: () => Promise<void>;
   refreshSubscriptionStatus: () => Promise<string>;
   upsertWager: (wager: Wager) => void;
@@ -239,6 +245,36 @@ export const useAppStore = create<AppState>((set, get) => ({
       ),
     }));
     await settleWager(wagerId, winnerHandle);
+  },
+
+  declareResult: async (wagerId, winnerHandle) => {
+    const me = get().user.handle;
+    set((s) => ({
+      wagers: s.wagers.map((w) =>
+        w.id === wagerId
+          ? { ...w, status: "AWAITING_RESULT", winnerHandle, declarerHandle: me }
+          : w
+      ),
+    }));
+    await declareWagerResult(wagerId, winnerHandle);
+  },
+
+  confirmResult: async (wagerId) => {
+    set((s) => ({
+      wagers: s.wagers.map((w) =>
+        w.id === wagerId ? { ...w, status: "SETTLED" } : w
+      ),
+    }));
+    await confirmWagerResult(wagerId);
+  },
+
+  disputeResult: async (wagerId) => {
+    set((s) => ({
+      wagers: s.wagers.map((w) =>
+        w.id === wagerId ? { ...w, status: "DISPUTED" } : w
+      ),
+    }));
+    await disputeWagerResult(wagerId);
   },
 
   hydrateFromBackend: async () => {
