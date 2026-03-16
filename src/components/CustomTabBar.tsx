@@ -10,6 +10,7 @@ const TAB_ICONS: Record<string, { active: IoniconName; inactive: IoniconName }> 
   Home: { active: "home", inactive: "home-outline" },
   Wagers: { active: "trophy", inactive: "trophy-outline" },
   Feed: { active: "newspaper", inactive: "newspaper-outline" },
+  Groups: { active: "people", inactive: "people-outline" },
   Profile: { active: "person", inactive: "person-outline" },
 };
 

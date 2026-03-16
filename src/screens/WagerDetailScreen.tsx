@@ -9,10 +9,21 @@ import {
   Text,
   View,
 } from "react-native";
-import { fetchWagerById } from "../services/wagers";
+import { fetchSideBets, fetchWagerById } from "../services/wagers";
 import { useAppStore } from "../store/useAppStore";
 import { theme } from "../theme";
 import { PaymentMethod, Wager, WagerStatus } from "../types";
+
+const SPORT_EMOJI: Record<string, string> = {
+  golf: "⛳",
+  tennis: "🎾",
+  pickleball: "🏓",
+  pool: "🎱",
+  darts: "🎯",
+  padel: "🏸",
+  poker: "♠️",
+  custom: "🤝",
+};
 
 function timeAgo(dateStr: string): string {
   const diff = Date.now() - new Date(dateStr).getTime();
@@ -95,12 +106,15 @@ export default function WagerDetailScreen({
 }) {
   const wagerId: string = route.params?.wagerId;
   const wagers = useAppStore((s) => s.wagers);
+  const groups = useAppStore((s) => s.groups);
   const upsertWager = useAppStore((s) => s.upsertWager);
   const user = useAppStore((s) => s.user);
   const respondToChallenge = useAppStore((s) => s.respondToChallenge);
   const declareResult = useAppStore((s) => s.declareResult);
   const confirmResult = useAppStore((s) => s.confirmResult);
   const disputeResult = useAppStore((s) => s.disputeResult);
+  const setCreateWagerVisible = useAppStore((s) => s.setCreateWagerVisible);
+  const setCreateWagerContext = useAppStore((s) => s.setCreateWagerContext);
 
   const [challengeActionLoading, setChallengeActionLoading] = useState<
     "" | "accept" | "decline"
@@ -109,6 +123,8 @@ export default function WagerDetailScreen({
     "" | "won" | "lost" | "confirm" | "dispute"
   >("");
   const [isFetching, setIsFetching] = useState(false);
+  const [sideBets, setSideBets] = useState<Wager[]>([]);
+  const [sideBetsLoading, setSideBetsLoading] = useState(false);
 
   const storeWager = wagers.find((w) => w.id === wagerId);
 
@@ -122,6 +138,23 @@ export default function WagerDetailScreen({
       });
     }
   }, [wagerId, storeWager]);
+
+  // Load side bets for active+ wagers
+  useEffect(() => {
+    const wager = storeWager;
+    if (!wager) return;
+    if (
+      wager.status === "ACTIVE" ||
+      wager.status === "AWAITING_RESULT" ||
+      wager.status === "DISPUTED" ||
+      wager.status === "SETTLED"
+    ) {
+      setSideBetsLoading(true);
+      fetchSideBets(wager.id)
+        .then(setSideBets)
+        .finally(() => setSideBetsLoading(false));
+    }
+  }, [storeWager?.id, storeWager?.status]);
 
   const wager = storeWager ?? null;
 
@@ -142,6 +175,9 @@ export default function WagerDetailScreen({
   }
 
   const config = STATUS_CONFIG[wager.status] ?? STATUS_CONFIG.PENDING;
+  const groupName = wager.groupId
+    ? groups.find((g) => g.id === wager.groupId)?.name ?? null
+    : null;
   const isWin = wager.status === "SETTLED" && wager.winnerHandle === user.handle;
   const isLoss = wager.status === "SETTLED" && wager.winnerHandle != null && wager.winnerHandle !== user.handle;
   const isChallengeToMe =
@@ -232,6 +268,28 @@ export default function WagerDetailScreen({
 
         {/* Details */}
         <View style={styles.detailsCard}>
+          {wager.sport && (
+            <>
+              <View style={styles.detailRow}>
+                <Text style={styles.detailLabel}>Sport</Text>
+                <Text style={styles.detailValue}>
+                  {SPORT_EMOJI[wager.sport] ?? "🏆"} {wager.sport.charAt(0).toUpperCase() + wager.sport.slice(1)}
+                </Text>
+              </View>
+              <View style={styles.detailDivider} />
+            </>
+          )}
+          {wager.betType && (
+            <>
+              <View style={styles.detailRow}>
+                <Text style={styles.detailLabel}>Bet Type</Text>
+                <Text style={styles.detailValue}>
+                  {wager.betType.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())}
+                </Text>
+              </View>
+              <View style={styles.detailDivider} />
+            </>
+          )}
           <View style={styles.detailRow}>
             <Text style={styles.detailLabel}>Activity</Text>
             <Text style={styles.detailValue}>{wager.activity}</Text>
@@ -242,6 +300,15 @@ export default function WagerDetailScreen({
               <View style={styles.detailRow}>
                 <Text style={styles.detailLabel}>Terms</Text>
                 <Text style={[styles.detailValue, styles.detailValueWrap]}>{wager.termsText}</Text>
+              </View>
+            </>
+          )}
+          {groupName && (
+            <>
+              <View style={styles.detailDivider} />
+              <View style={styles.detailRow}>
+                <Text style={styles.detailLabel}>Group</Text>
+                <Text style={styles.detailValue}>{groupName}</Text>
               </View>
             </>
           )}
@@ -413,6 +480,80 @@ export default function WagerDetailScreen({
               <Text style={styles.payHint}>
                 Arrange payment directly with your opponent.
               </Text>
+            )}
+          </View>
+        )}
+
+        {/* Side Bets */}
+        {(wager.status === "ACTIVE" ||
+          wager.status === "AWAITING_RESULT" ||
+          wager.status === "DISPUTED" ||
+          wager.status === "SETTLED") && (
+          <View style={styles.sideBetsCard}>
+            <View style={styles.sideBetsHeader}>
+              <Text style={styles.actionsTitle}>Side Bets</Text>
+              <Pressable
+                style={styles.sideBetAddBtn}
+                onPress={() => {
+                  setCreateWagerContext({
+                    parentWagerId: wager.id,
+                    groupId: wager.groupId,
+                  });
+                  setCreateWagerVisible(true);
+                }}
+              >
+                <Text style={styles.sideBetAddBtnText}>+</Text>
+              </Pressable>
+            </View>
+            {sideBetsLoading ? (
+              <ActivityIndicator
+                color={theme.colors.accent}
+                style={{ marginVertical: 12 }}
+              />
+            ) : sideBets.length === 0 ? (
+              <Text style={styles.sideBetsEmpty}>
+                No side bets yet. Tap + to add one.
+              </Text>
+            ) : (
+              <View style={styles.sideBetsList}>
+                {sideBets.map((sb) => {
+                  const sbStatus = STATUS_CONFIG[sb.status] ?? STATUS_CONFIG.PENDING;
+                  return (
+                    <Pressable
+                      key={sb.id}
+                      style={styles.sideBetRow}
+                      onPress={() =>
+                        navigation.push("WagerDetail", { wagerId: sb.id })
+                      }
+                    >
+                      <Text style={styles.sideBetAmount}>
+                        ${sb.amount.toFixed(0)}
+                      </Text>
+                      <Text style={styles.sideBetOpponent} numberOfLines={1}>
+                        vs {sb.opponentHandle}
+                      </Text>
+                      <View
+                        style={[
+                          styles.sideBetBadge,
+                          {
+                            borderColor: `${sbStatus.color}60`,
+                            backgroundColor: `${sbStatus.color}18`,
+                          },
+                        ]}
+                      >
+                        <Text
+                          style={[
+                            styles.sideBetBadgeText,
+                            { color: sbStatus.color },
+                          ]}
+                        >
+                          {sbStatus.label.toUpperCase()}
+                        </Text>
+                      </View>
+                    </Pressable>
+                  );
+                })}
+              </View>
             )}
           </View>
         )}
@@ -692,5 +833,76 @@ const styles = StyleSheet.create({
     color: theme.colors.textMuted,
     fontSize: 13,
     lineHeight: 18,
+  },
+  sideBetsCard: {
+    backgroundColor: theme.colors.bgSecondary,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
+  },
+  sideBetsHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 12,
+  },
+  sideBetAddBtn: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: theme.colors.accent,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  sideBetAddBtnText: {
+    color: "#001B10",
+    fontSize: 20,
+    fontWeight: "700",
+    lineHeight: 24,
+  },
+  sideBetsEmpty: {
+    color: theme.colors.textMuted,
+    fontSize: 13,
+    lineHeight: 18,
+  },
+  sideBetsList: {
+    gap: 8,
+  },
+  sideBetRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: theme.colors.bgTertiary,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    gap: 10,
+  },
+  sideBetAmount: {
+    color: theme.colors.textPrimary,
+    fontWeight: "800",
+    fontSize: 15,
+    fontVariant: ["tabular-nums"],
+    flexShrink: 0,
+  },
+  sideBetOpponent: {
+    color: theme.colors.textMuted,
+    fontSize: 13,
+    flex: 1,
+  },
+  sideBetBadge: {
+    borderWidth: 1,
+    borderRadius: 999,
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    flexShrink: 0,
+  },
+  sideBetBadgeText: {
+    fontSize: 9,
+    fontWeight: "700",
+    letterSpacing: 0.4,
   },
 });

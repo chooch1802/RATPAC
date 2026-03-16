@@ -18,6 +18,11 @@ import {
   settleWager,
 } from "../services/wagers";
 import {
+  fetchMyGroups,
+  createGroup as createGroupService,
+  joinGroupByCode,
+} from "../services/groups";
+import {
   GamblingSettings,
   WageredTotals,
   checkWagerBlocked,
@@ -26,7 +31,7 @@ import {
   saveGamblingLimits,
   setSelfExclusion,
 } from "../services/gambling";
-import { Activity, FeedPost, Notification, PaymentMethod, Reactions, UserProfile, Wager } from "../types";
+import { Activity, FeedPost, Group, Notification, PaymentMethod, Reactions, UserProfile, Wager } from "../types";
 
 type OnboardingDraft = {
   handle: string;
@@ -42,6 +47,10 @@ type CreateWagerPayload = {
   isPublic: boolean;
   paymentMethod: PaymentMethod;
   paymentHandle: string;
+  sport?: string;
+  betType?: string;
+  groupId?: string;
+  parentWagerId?: string;
 };
 
 type AppState = {
@@ -64,6 +73,8 @@ type AppState = {
   notificationsEnabled: boolean;
   challengeAlertsEnabled: boolean;
   settlementAlertsEnabled: boolean;
+  groups: Group[];
+  createWagerContext: { parentWagerId?: string; groupId?: string } | null;
 
   setAuth: (next: boolean) => void;
   setNotificationsEnabled: (next: boolean) => void;
@@ -78,6 +89,7 @@ type AppState = {
   setSubscribed: (next: boolean) => void;
   setPaywallVisible: (next: boolean) => void;
   setCreateWagerVisible: (next: boolean) => void;
+  setCreateWagerContext: (ctx: { parentWagerId?: string; groupId?: string } | null) => void;
   createWager: (payload: CreateWagerPayload) => Promise<void>;
   markWagerSettled: (wagerId: string, winnerHandle: string) => Promise<void>;
   declareResult: (wagerId: string, winnerHandle: string) => Promise<void>;
@@ -96,6 +108,10 @@ type AppState = {
   saveGamblingLimits: (daily: number | null, weekly: number | null, monthly: number | null) => Promise<{ ok: boolean; message: string }>;
   activateSelfExclusion: (days: number) => Promise<{ ok: boolean; message: string }>;
   refreshGamblingSettings: () => Promise<void>;
+  loadGroups: () => Promise<void>;
+  createGroup: (name: string) => Promise<Group | null>;
+  joinGroup: (code: string) => Promise<{ ok: boolean; message: string }>;
+  upsertGroup: (group: Group) => void;
 };
 
 export const useAppStore = create<AppState>((set, get) => ({
@@ -129,6 +145,8 @@ export const useAppStore = create<AppState>((set, get) => ({
   notificationsEnabled: true,
   challengeAlertsEnabled: true,
   settlementAlertsEnabled: true,
+  groups: [],
+  createWagerContext: null,
 
   setAuth: (next) => set({ isAuthed: next }),
 
@@ -177,8 +195,9 @@ export const useAppStore = create<AppState>((set, get) => ({
   setSubscribed: (next) => set((s) => ({ user: { ...s.user, isSubscribed: next } })),
   setPaywallVisible: (next) => set({ showPaywall: next }),
   setCreateWagerVisible: (next) => set({ showCreateWager: next }),
+  setCreateWagerContext: (ctx) => set({ createWagerContext: ctx }),
 
-  createWager: async ({ activity, amount, opponentHandle, termsText, isPublic, paymentMethod, paymentHandle }) => {
+  createWager: async ({ activity, amount, opponentHandle, termsText, isPublic, paymentMethod, paymentHandle, sport, betType, groupId, parentWagerId }) => {
     const state = get();
     if (!state.user.isSubscribed) {
       set({ showPaywall: true });
@@ -201,6 +220,10 @@ export const useAppStore = create<AppState>((set, get) => ({
       isPublic,
       paymentMethod,
       paymentHandle: paymentHandle.trim() || undefined,
+      sport,
+      betType,
+      groupId,
+      parentWagerId,
     });
     const newWager: Wager = {
       ...wager,
@@ -208,6 +231,10 @@ export const useAppStore = create<AppState>((set, get) => ({
       termsText,
       paymentMethod,
       paymentHandle: paymentHandle.trim() || undefined,
+      sport,
+      betType,
+      groupId,
+      parentWagerId,
       createdAt: new Date().toISOString(),
     };
     const post: FeedPost = {
@@ -520,4 +547,43 @@ export const useAppStore = create<AppState>((set, get) => ({
     }
     return result;
   },
+
+  loadGroups: async () => {
+    const groups = await fetchMyGroups();
+    set({ groups });
+  },
+
+  createGroup: async (name) => {
+    const group = await createGroupService(name);
+    if (group) {
+      set((s) => ({ groups: [group, ...s.groups] }));
+    }
+    return group;
+  },
+
+  joinGroup: async (code) => {
+    const result = await joinGroupByCode(code);
+    if (result.ok && result.group) {
+      const group = result.group;
+      set((s) => {
+        const existingIndex = s.groups.findIndex((g) => g.id === group.id);
+        const groups =
+          existingIndex === -1
+            ? [group, ...s.groups]
+            : s.groups.map((g) => (g.id === group.id ? { ...g, ...group } : g));
+        return { groups };
+      });
+    }
+    return { ok: result.ok, message: result.message };
+  },
+
+  upsertGroup: (group) =>
+    set((s) => {
+      const existingIndex = s.groups.findIndex((g) => g.id === group.id);
+      const groups =
+        existingIndex === -1
+          ? [group, ...s.groups]
+          : s.groups.map((g) => (g.id === group.id ? { ...g, ...group } : g));
+      return { groups };
+    }),
 }));

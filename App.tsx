@@ -10,6 +10,8 @@ import { CustomTabBar } from "./src/components/CustomTabBar";
 import { PaywallModal } from "./src/components/PaywallModal";
 
 import FeedScreen from "./src/screens/FeedScreen";
+import GroupDetailScreen from "./src/screens/GroupDetailScreen";
+import GroupsScreen from "./src/screens/GroupsScreen";
 import HomeScreen from "./src/screens/HomeScreen";
 import NotificationsScreen from "./src/screens/NotificationsScreen";
 import OnboardingScreen from "./src/screens/OnboardingScreen";
@@ -82,7 +84,7 @@ function TabsNavigator() {
     >
       <Tabs.Screen name="Home" component={HomeScreen} />
       <Tabs.Screen name="Wagers" component={WagersScreen} />
-      <Tabs.Screen name="Feed" component={FeedScreen} />
+      <Tabs.Screen name="Groups" component={GroupsScreen} />
       <Tabs.Screen name="Profile" component={ProfileScreen} />
     </Tabs.Navigator>
   );
@@ -120,6 +122,16 @@ function AppNavigator() {
       <AppStack.Screen
         name="EditProfile"
         component={EditProfileScreen}
+        options={{ presentation: "card" }}
+      />
+      <AppStack.Screen
+        name="GroupDetail"
+        component={GroupDetailScreen}
+        options={{ presentation: "card" }}
+      />
+      <AppStack.Screen
+        name="Feed"
+        component={FeedScreen}
         options={{ presentation: "card" }}
       />
     </AppStack.Navigator>

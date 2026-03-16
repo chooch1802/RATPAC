@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   Modal,
   Pressable,
@@ -11,7 +11,7 @@ import {
 } from "react-native";
 import { useAppStore } from "../store/useAppStore";
 import { theme } from "../theme";
-import { PaymentMethod } from "../types";
+import { Group, PaymentMethod } from "../types";
 
 const PAYMENT_METHODS: { id: PaymentMethod; icon: string }[] = [
   { id: "Venmo", icon: "💙" },
@@ -20,33 +20,132 @@ const PAYMENT_METHODS: { id: PaymentMethod; icon: string }[] = [
   { id: "Other", icon: "💸" },
 ];
 
-type Step = 1 | 2 | 3 | 4 | 5;
+type Sport = {
+  id: string;
+  name: string;
+  icon: string;
+};
+
+type BetTypeOption = {
+  id: string;
+  name: string;
+  description: string;
+};
+
+const SPORTS: Sport[] = [
+  { id: "golf", name: "Golf", icon: "⛳" },
+  { id: "tennis", name: "Tennis", icon: "🎾" },
+  { id: "pickleball", name: "Pickleball", icon: "🏓" },
+  { id: "pool", name: "Pool", icon: "🎱" },
+  { id: "darts", name: "Darts", icon: "🎯" },
+  { id: "padel", name: "Padel", icon: "🏸" },
+  { id: "poker", name: "Poker", icon: "♠️" },
+  { id: "custom", name: "Custom", icon: "🤝" },
+];
+
+const BET_TYPES: Record<string, BetTypeOption[]> = {
+  golf: [
+    { id: "nassau", name: "Nassau", description: "Three separate bets: front 9, back 9, overall 18" },
+    { id: "skins", name: "Skins", description: "Win each hole outright to earn skins" },
+    { id: "match_play", name: "Match Play", description: "Win holes to win the match" },
+    { id: "stroke_play", name: "Stroke Play", description: "Lowest total score wins" },
+    { id: "wolf", name: "Wolf", description: "Rotating captain picks partner each hole" },
+    { id: "custom", name: "Custom", description: "Define your own bet terms" },
+  ],
+  tennis: [
+    { id: "match_winner", name: "Match Winner", description: "Bet on who wins the full match" },
+    { id: "set_betting", name: "Set Betting", description: "Predict the exact set score" },
+    { id: "handicap", name: "Handicap", description: "Bet with a game or set handicap applied" },
+    { id: "custom", name: "Custom", description: "Define your own bet terms" },
+  ],
+  pickleball: [
+    { id: "match_winner", name: "Match Winner", description: "Bet on who wins the match" },
+    { id: "game_by_game", name: "Game by Game", description: "Bet on individual game outcomes" },
+    { id: "custom", name: "Custom", description: "Define your own bet terms" },
+  ],
+  pool: [
+    { id: "match_winner", name: "Match Winner", description: "Bet on who wins the match" },
+    { id: "race_to_n", name: "Race to N", description: "First to win N racks takes the bet" },
+    { id: "custom", name: "Custom", description: "Define your own bet terms" },
+  ],
+  darts: [
+    { id: "match_winner", name: "Match Winner", description: "Bet on who wins the match" },
+    { id: "best_of_legs", name: "Best of Legs", description: "Bet on best of a set number of legs" },
+    { id: "custom", name: "Custom", description: "Define your own bet terms" },
+  ],
+  padel: [
+    { id: "match_winner", name: "Match Winner", description: "Bet on who wins the match" },
+    { id: "custom", name: "Custom", description: "Define your own bet terms" },
+  ],
+  poker: [
+    { id: "session_winner", name: "Session Winner", description: "Bet on who finishes with the most chips" },
+    { id: "prop_bet", name: "Prop Bet", description: "Side bet on a specific in-game outcome" },
+    { id: "custom", name: "Custom", description: "Define your own bet terms" },
+  ],
+  custom: [
+    { id: "custom", name: "Custom Bet", description: "Name and describe your own wager" },
+  ],
+};
+
+function getTermsPlaceholder(sportId: string, betTypeId: string): string {
+  if (sportId === "golf") {
+    if (betTypeId === "nassau") return "e.g. $5 Nassau at Torrey Pines, full handicap";
+    if (betTypeId === "skins") return "e.g. Skins game, $2 per skin at Augusta National";
+    return "e.g. Lowest gross score over 18 holes";
+  }
+  if (sportId === "tennis") return "e.g. Best of 3 sets at the local club, no handicap";
+  if (sportId === "pickleball") return "e.g. Best of 3 games, first to 11 wins";
+  if (sportId === "pool") return "e.g. 8-ball, race to 5 racks";
+  if (sportId === "darts") return "e.g. 501, straight in straight out, best of 5 legs";
+  if (sportId === "padel") return "e.g. Best of 3 sets at the padel club";
+  if (sportId === "poker") return "e.g. Home game this Friday, whoever finishes with most chips";
+  return "Describe the wager terms...";
+}
+
+type Step = 1 | 2 | 3 | 4;
 
 export function CreateWagerModal() {
   const showCreateWager = useAppStore((s) => s.showCreateWager);
   const setCreateWagerVisible = useAppStore((s) => s.setCreateWagerVisible);
   const createWager = useAppStore((s) => s.createWager);
-  const allowedActivities = useAppStore((s) => s.allowedActivities);
   const user = useAppStore((s) => s.user);
+  const groups = useAppStore((s) => s.groups);
+  const createWagerContext = useAppStore((s) => s.createWagerContext);
+  const setCreateWagerContext = useAppStore((s) => s.setCreateWagerContext);
 
   const [step, setStep] = useState<Step>(1);
-  const [selectedActivity, setSelectedActivity] = useState("");
-  const [customActivityName, setCustomActivityName] = useState("");
+  const [selectedSport, setSelectedSport] = useState<Sport | null>(null);
+  const [selectedBetType, setSelectedBetType] = useState<BetTypeOption | null>(null);
+  const [betName, setBetName] = useState("");
   const [termsText, setTermsText] = useState("");
   const [amount, setAmount] = useState("");
   const [opponent, setOpponent] = useState("");
+  const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
+  const [showGroupPicker, setShowGroupPicker] = useState(false);
   const [isPublic, setIsPublic] = useState(true);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("Venmo");
   const [paymentHandle, setPaymentHandle] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // Read context from store when modal opens
+  useEffect(() => {
+    if (showCreateWager && createWagerContext) {
+      if (createWagerContext.groupId) {
+        setSelectedGroupId(createWagerContext.groupId);
+      }
+    }
+  }, [showCreateWager, createWagerContext]);
+
   function reset() {
     setStep(1);
-    setSelectedActivity("");
-    setCustomActivityName("");
+    setSelectedSport(null);
+    setSelectedBetType(null);
+    setBetName("");
     setTermsText("");
     setAmount("");
     setOpponent("");
+    setSelectedGroupId(null);
+    setShowGroupPicker(false);
     setIsPublic(true);
     setPaymentMethod("Venmo");
     setPaymentHandle("");
@@ -54,32 +153,62 @@ export function CreateWagerModal() {
 
   function close() {
     reset();
+    setCreateWagerContext(null);
     setCreateWagerVisible(false);
   }
 
   async function submit() {
+    if (!selectedSport || !selectedBetType) return;
     setIsSubmitting(true);
+
+    const isCustomBetType = selectedBetType.id === "custom";
     const activityName =
-      selectedActivity === "Custom" && customActivityName.trim()
-        ? customActivityName.trim()
-        : selectedActivity;
-    await createWager({
-      activity: activityName,
-      amount: parseFloat(amount) || 0,
-      opponentHandle: opponent.trim(),
-      termsText: termsText.trim(),
-      isPublic,
-      paymentMethod,
-      paymentHandle,
-    });
+      isCustomBetType && betName.trim()
+        ? betName.trim()
+        : selectedBetType.name !== "Custom Bet"
+        ? `${selectedSport.name} — ${selectedBetType.name}`
+        : selectedSport.name;
+
+    try {
+      await createWager({
+        activity: activityName,
+        amount: parseFloat(amount) || 0,
+        opponentHandle: opponent.trim(),
+        termsText: termsText.trim(),
+        isPublic,
+        paymentMethod,
+        paymentHandle,
+        sport: selectedSport.id,
+        betType: selectedBetType.id,
+        groupId: selectedGroupId ?? undefined,
+        parentWagerId: createWagerContext?.parentWagerId ?? undefined,
+      });
+    } catch {
+      // error handled by store
+    }
     setIsSubmitting(false);
     reset();
+    setCreateWagerContext(null);
   }
 
-  const canAdvanceStep1 = selectedActivity.length > 0 &&
-    (selectedActivity !== "Custom" || customActivityName.trim().length > 0);
+  const canAdvanceStep1 = selectedSport !== null;
+  const canAdvanceStep2 =
+    selectedBetType !== null &&
+    (selectedBetType.id !== "custom" || betName.trim().length > 0);
   const canAdvanceStep3 =
     parseFloat(amount) >= 1 && opponent.trim().length > 0;
+
+  const selectedGroup = groups.find((g) => g.id === selectedGroupId) ?? null;
+  const betTypeOptions = selectedSport ? BET_TYPES[selectedSport.id] ?? [] : [];
+
+  function getStepTitle(): string {
+    switch (step) {
+      case 1: return "Select Sport";
+      case 2: return "Bet Type";
+      case 3: return "Amount & Opponent";
+      case 4: return "Review & Send";
+    }
+  }
 
   return (
     <Modal
@@ -95,83 +224,106 @@ export function CreateWagerModal() {
 
           {/* Header */}
           <View style={styles.sheetHeader}>
-            <Text style={styles.sheetTitle}>
-              {step === 1 && "Select Activity"}
-              {step === 2 && "Set Terms"}
-              {step === 3 && "Amount & Opponent"}
-              {step === 4 && "Review & Confirm"}
-              {step === 5 && "Share to Feed"}
-            </Text>
-            <Text style={styles.stepIndicator}>{step} / 5</Text>
+            <Text style={styles.sheetTitle}>{getStepTitle()}</Text>
+            <Text style={styles.stepIndicator}>{step} / 4</Text>
           </View>
 
-          <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
-            {/* Step 1: Activity */}
+          <ScrollView
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+          >
+            {/* Step 1: Sport */}
             {step === 1 && (
-              <View>
-                <View style={styles.activityGrid}>
-                  {allowedActivities.map((a) => (
-                    <Pressable
-                      key={a.id}
+              <View style={styles.sportGrid}>
+                {SPORTS.map((sport) => (
+                  <Pressable
+                    key={sport.id}
+                    style={[
+                      styles.sportItem,
+                      selectedSport?.id === sport.id && styles.sportItemSelected,
+                    ]}
+                    onPress={() => {
+                      setSelectedSport(sport);
+                      setSelectedBetType(null);
+                      setBetName("");
+                    }}
+                  >
+                    <Text style={styles.sportIcon}>{sport.icon}</Text>
+                    <Text
                       style={[
-                        styles.activityItem,
-                        selectedActivity === a.name && styles.activityItemSelected,
+                        styles.sportName,
+                        selectedSport?.id === sport.id && styles.sportNameSelected,
                       ]}
-                      onPress={() => setSelectedActivity(a.name)}
                     >
-                      <Text style={styles.activityIcon}>{a.icon}</Text>
+                      {sport.name}
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
+            )}
+
+            {/* Step 2: Bet Type */}
+            {step === 2 && selectedSport && (
+              <View>
+                {betTypeOptions.map((option) => (
+                  <Pressable
+                    key={option.id}
+                    style={[
+                      styles.betTypeRow,
+                      selectedBetType?.id === option.id && styles.betTypeRowSelected,
+                    ]}
+                    onPress={() => setSelectedBetType(option)}
+                  >
+                    <View style={styles.betTypeContent}>
                       <Text
                         style={[
-                          styles.activityName,
-                          selectedActivity === a.name && styles.activityNameSelected,
+                          styles.betTypeName,
+                          selectedBetType?.id === option.id && styles.betTypeNameSelected,
                         ]}
                       >
-                        {a.name}
+                        {option.name}
                       </Text>
-                    </Pressable>
-                  ))}
-                </View>
-                {selectedActivity === "Custom" && (
+                      <Text style={styles.betTypeDesc}>{option.description}</Text>
+                    </View>
+                    {selectedBetType?.id === option.id && (
+                      <View style={styles.betTypeCheck}>
+                        <Text style={styles.betTypeCheckText}>✓</Text>
+                      </View>
+                    )}
+                  </Pressable>
+                ))}
+
+                {selectedBetType?.id === "custom" && (
                   <TextInput
-                    value={customActivityName}
-                    onChangeText={setCustomActivityName}
-                    placeholder="Describe your activity..."
+                    value={betName}
+                    onChangeText={setBetName}
+                    placeholder="Bet name (e.g. Side action on the 9th hole)"
                     placeholderTextColor={theme.colors.textMuted}
-                    style={styles.input}
+                    style={[styles.input, { marginTop: 12 }]}
+                    autoCapitalize="sentences"
+                  />
+                )}
+
+                {selectedBetType && (
+                  <TextInput
+                    value={termsText}
+                    onChangeText={setTermsText}
+                    placeholder={
+                      selectedSport
+                        ? getTermsPlaceholder(selectedSport.id, selectedBetType.id)
+                        : "Describe the wager terms..."
+                    }
+                    placeholderTextColor={theme.colors.textMuted}
+                    style={[styles.input, styles.inputMultiline]}
+                    multiline
+                    numberOfLines={4}
                     autoCapitalize="sentences"
                   />
                 )}
               </View>
             )}
 
-            {/* Step 2: Terms */}
-            {step === 2 && (
-              <View>
-                <Text style={styles.stepLabel}>
-                  {selectedActivity === "Custom"
-                    ? "What's the bet?"
-                    : `What are the terms for your ${selectedActivity} wager?`}
-                </Text>
-                <TextInput
-                  value={termsText}
-                  onChangeText={setTermsText}
-                  placeholder={
-                    selectedActivity === "Golf"
-                      ? "e.g. Lowest score over 18 holes at Royal Melbourne"
-                      : selectedActivity === "Darts"
-                      ? "e.g. 501, straight out — best of 3 legs"
-                      : "Describe the wager terms..."
-                  }
-                  placeholderTextColor={theme.colors.textMuted}
-                  style={[styles.input, styles.inputMultiline]}
-                  multiline
-                  numberOfLines={4}
-                  autoCapitalize="sentences"
-                />
-              </View>
-            )}
-
-            {/* Step 3: Amount & Opponent */}
+            {/* Step 3: Amount, Opponent, Group */}
             {step === 3 && (
               <View>
                 <Text style={styles.stepLabel}>Wager amount</Text>
@@ -186,46 +338,159 @@ export function CreateWagerModal() {
                     style={[styles.input, styles.amountInput]}
                   />
                 </View>
+
                 <Text style={styles.stepLabel}>Challenge opponent</Text>
-                <TextInput
-                  value={opponent}
-                  onChangeText={setOpponent}
-                  placeholder="@username"
-                  placeholderTextColor={theme.colors.textMuted}
-                  style={styles.input}
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                />
+                <View style={styles.atRow}>
+                  <Text style={styles.atPrefix}>@</Text>
+                  <TextInput
+                    value={opponent}
+                    onChangeText={setOpponent}
+                    placeholder="username"
+                    placeholderTextColor={theme.colors.textMuted}
+                    style={[styles.input, styles.opponentInput]}
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                  />
+                </View>
+
+                <Text style={styles.stepLabel}>Group (optional)</Text>
+                {!showGroupPicker ? (
+                  <Pressable
+                    style={styles.groupPickerBtn}
+                    onPress={() => setShowGroupPicker(true)}
+                  >
+                    {selectedGroup ? (
+                      <View style={styles.groupPickerSelected}>
+                        <View
+                          style={[
+                            styles.groupDot,
+                            { backgroundColor: selectedGroup.avatarColor },
+                          ]}
+                        />
+                        <Text style={styles.groupPickerText}>{selectedGroup.name}</Text>
+                      </View>
+                    ) : (
+                      <Text style={styles.groupPickerPlaceholder}>Add to group...</Text>
+                    )}
+                    <Text style={styles.groupPickerArrow}>›</Text>
+                  </Pressable>
+                ) : (
+                  <View style={styles.groupList}>
+                    <Pressable
+                      style={[
+                        styles.groupListItem,
+                        selectedGroupId === null && styles.groupListItemSelected,
+                      ]}
+                      onPress={() => {
+                        setSelectedGroupId(null);
+                        setShowGroupPicker(false);
+                      }}
+                    >
+                      <Text
+                        style={[
+                          styles.groupListItemText,
+                          selectedGroupId === null && styles.groupListItemTextSelected,
+                        ]}
+                      >
+                        None
+                      </Text>
+                    </Pressable>
+                    {groups.map((g) => (
+                      <Pressable
+                        key={g.id}
+                        style={[
+                          styles.groupListItem,
+                          selectedGroupId === g.id && styles.groupListItemSelected,
+                        ]}
+                        onPress={() => {
+                          setSelectedGroupId(g.id);
+                          setShowGroupPicker(false);
+                        }}
+                      >
+                        <View style={[styles.groupDot, { backgroundColor: g.avatarColor }]} />
+                        <Text
+                          style={[
+                            styles.groupListItemText,
+                            selectedGroupId === g.id && styles.groupListItemTextSelected,
+                          ]}
+                        >
+                          {g.name}
+                        </Text>
+                      </Pressable>
+                    ))}
+                  </View>
+                )}
               </View>
             )}
 
-            {/* Step 4: Review */}
-            {step === 4 && (
+            {/* Step 4: Review + Payment + Share */}
+            {step === 4 && selectedSport && selectedBetType && (
               <View>
                 <View style={styles.reviewCard}>
                   <View style={styles.reviewRow}>
-                    <Text style={styles.reviewLabel}>Activity</Text>
+                    <Text style={styles.reviewLabel}>Sport</Text>
                     <Text style={styles.reviewValue}>
-                      {selectedActivity === "Custom" ? customActivityName : selectedActivity}
+                      {selectedSport.icon} {selectedSport.name}
                     </Text>
                   </View>
-                  {termsText.trim().length > 0 && (
-                    <View style={styles.reviewRow}>
-                      <Text style={styles.reviewLabel}>Terms</Text>
-                      <Text style={[styles.reviewValue, styles.reviewValueSmall]}>{termsText}</Text>
-                    </View>
+                  <View style={styles.detailDivider} />
+                  <View style={styles.reviewRow}>
+                    <Text style={styles.reviewLabel}>Bet Type</Text>
+                    <Text style={styles.reviewValue}>{selectedBetType.name}</Text>
+                  </View>
+                  {selectedBetType.id === "custom" && betName.trim().length > 0 && (
+                    <>
+                      <View style={styles.detailDivider} />
+                      <View style={styles.reviewRow}>
+                        <Text style={styles.reviewLabel}>Bet Name</Text>
+                        <Text style={styles.reviewValue}>{betName.trim()}</Text>
+                      </View>
+                    </>
                   )}
+                  {termsText.trim().length > 0 && (
+                    <>
+                      <View style={styles.detailDivider} />
+                      <View style={styles.reviewRow}>
+                        <Text style={styles.reviewLabel}>Terms</Text>
+                        <Text style={[styles.reviewValue, styles.reviewValueSmall]}>
+                          {termsText.trim()}
+                        </Text>
+                      </View>
+                    </>
+                  )}
+                  <View style={styles.detailDivider} />
                   <View style={styles.reviewRow}>
                     <Text style={styles.reviewLabel}>Your stake</Text>
                     <Text style={[styles.reviewValue, styles.reviewValueAccent]}>
                       ${parseFloat(amount || "0").toFixed(2)}
                     </Text>
                   </View>
+                  <View style={styles.detailDivider} />
                   <View style={styles.reviewRow}>
                     <Text style={styles.reviewLabel}>Vs</Text>
-                    <Text style={styles.reviewValue}>{opponent}</Text>
+                    <Text style={styles.reviewValue}>
+                      {opponent.startsWith("@") ? opponent : `@${opponent}`}
+                    </Text>
                   </View>
+                  {selectedGroup && (
+                    <>
+                      <View style={styles.detailDivider} />
+                      <View style={styles.reviewRow}>
+                        <Text style={styles.reviewLabel}>Group</Text>
+                        <View style={styles.reviewGroupValue}>
+                          <View
+                            style={[
+                              styles.groupDot,
+                              { backgroundColor: selectedGroup.avatarColor },
+                            ]}
+                          />
+                          <Text style={styles.reviewValue}>{selectedGroup.name}</Text>
+                        </View>
+                      </View>
+                    </>
+                  )}
                 </View>
+
                 <Text style={styles.stepLabel}>How will you settle up?</Text>
                 <View style={styles.paymentGrid}>
                   {PAYMENT_METHODS.map((m) => (
@@ -269,12 +534,7 @@ export function CreateWagerModal() {
                 <Text style={styles.paymentHint}>
                   The loser pays the winner directly — no money passes through Ratpac.
                 </Text>
-              </View>
-            )}
 
-            {/* Step 5: Share */}
-            {step === 5 && (
-              <View>
                 <View style={styles.toggleRow}>
                   <View style={styles.toggleInfo}>
                     <Text style={styles.toggleTitle}>Share to feed</Text>
@@ -300,29 +560,37 @@ export function CreateWagerModal() {
             )}
           </ScrollView>
 
-          {/* Navigation buttons */}
+          {/* Navigation */}
           <View style={styles.navRow}>
             {step > 1 && (
-              <Pressable style={styles.backBtn} onPress={() => setStep((s) => (s - 1) as Step)}>
+              <Pressable
+                style={styles.backBtn}
+                onPress={() => setStep((s) => (s - 1) as Step)}
+              >
                 <Text style={styles.backBtnText}>Back</Text>
               </Pressable>
             )}
 
-            {step < 5 && (
+            {step < 4 && (
               <Pressable
                 style={[
                   styles.nextBtn,
                   step === 1 && !canAdvanceStep1 && styles.nextBtnDisabled,
+                  step === 2 && !canAdvanceStep2 && styles.nextBtnDisabled,
                   step === 3 && !canAdvanceStep3 && styles.nextBtnDisabled,
                 ]}
                 onPress={() => setStep((s) => (s + 1) as Step)}
-                disabled={(step === 1 && !canAdvanceStep1) || (step === 3 && !canAdvanceStep3)}
+                disabled={
+                  (step === 1 && !canAdvanceStep1) ||
+                  (step === 2 && !canAdvanceStep2) ||
+                  (step === 3 && !canAdvanceStep3)
+                }
               >
                 <Text style={styles.nextBtnText}>Next</Text>
               </Pressable>
             )}
 
-            {step === 5 && (
+            {step === 4 && (
               <Pressable
                 style={[styles.nextBtn, isSubmitting && styles.nextBtnDisabled]}
                 onPress={submit}
@@ -354,7 +622,7 @@ const styles = StyleSheet.create({
     borderTopColor: theme.colors.border,
     padding: 20,
     paddingBottom: 40,
-    maxHeight: "90%",
+    maxHeight: "92%",
   },
   handle: {
     width: 36,
@@ -380,13 +648,14 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: "500",
   },
-  activityGrid: {
+  // Step 1 — Sport grid
+  sportGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
     gap: 10,
     marginBottom: 16,
   },
-  activityItem: {
+  sportItem: {
     width: "30%",
     backgroundColor: theme.colors.bgTertiary,
     borderWidth: 1,
@@ -396,23 +665,70 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 6,
   },
-  activityItemSelected: {
+  sportItemSelected: {
     borderColor: theme.colors.accent,
     backgroundColor: `${theme.colors.accent}15`,
   },
-  activityIcon: {
+  sportIcon: {
     fontSize: 28,
   },
-  activityName: {
+  sportName: {
     color: theme.colors.textSecondary,
     fontSize: 12,
     fontWeight: "500",
     textAlign: "center",
   },
-  activityNameSelected: {
+  sportNameSelected: {
     color: theme.colors.accent,
     fontWeight: "700",
   },
+  // Step 2 — Bet type list
+  betTypeRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: theme.colors.bgTertiary,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 10,
+    gap: 12,
+  },
+  betTypeRowSelected: {
+    borderColor: theme.colors.accent,
+    backgroundColor: `${theme.colors.accent}10`,
+  },
+  betTypeContent: {
+    flex: 1,
+    gap: 3,
+  },
+  betTypeName: {
+    color: theme.colors.textPrimary,
+    fontSize: 15,
+    fontWeight: "700",
+  },
+  betTypeNameSelected: {
+    color: theme.colors.accent,
+  },
+  betTypeDesc: {
+    color: theme.colors.textMuted,
+    fontSize: 12,
+    lineHeight: 16,
+  },
+  betTypeCheck: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: theme.colors.accent,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  betTypeCheckText: {
+    color: "#001B10",
+    fontWeight: "800",
+    fontSize: 13,
+  },
+  // Shared inputs
   stepLabel: {
     color: theme.colors.textSecondary,
     fontSize: 13,
@@ -435,6 +751,7 @@ const styles = StyleSheet.create({
     height: 100,
     textAlignVertical: "top",
   },
+  // Step 3 — Amount & Opponent
   amountRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -442,29 +759,110 @@ const styles = StyleSheet.create({
   },
   currencyPrefix: {
     color: theme.colors.textPrimary,
-    fontSize: 22,
+    fontSize: 26,
     fontWeight: "700",
     marginRight: 6,
     marginTop: -2,
   },
   amountInput: {
     flex: 1,
-    fontSize: 22,
+    fontSize: 26,
     fontWeight: "700",
     fontVariant: ["tabular-nums"],
     marginBottom: 0,
   },
+  atRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 14,
+  },
+  atPrefix: {
+    color: theme.colors.textPrimary,
+    fontSize: 18,
+    fontWeight: "700",
+    marginRight: 4,
+    marginTop: -2,
+  },
+  opponentInput: {
+    flex: 1,
+    marginBottom: 0,
+  },
+  groupPickerBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    backgroundColor: theme.colors.bgTertiary,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 13,
+    marginBottom: 14,
+  },
+  groupPickerSelected: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  groupPickerText: {
+    color: theme.colors.textPrimary,
+    fontSize: 15,
+    fontWeight: "500",
+  },
+  groupPickerPlaceholder: {
+    color: theme.colors.textMuted,
+    fontSize: 15,
+  },
+  groupPickerArrow: {
+    color: theme.colors.textMuted,
+    fontSize: 18,
+  },
+  groupList: {
+    backgroundColor: theme.colors.bgTertiary,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    borderRadius: 12,
+    marginBottom: 14,
+    overflow: "hidden",
+  },
+  groupListItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 14,
+    paddingVertical: 13,
+    gap: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: theme.colors.border,
+  },
+  groupListItemSelected: {
+    backgroundColor: `${theme.colors.accent}15`,
+  },
+  groupListItemText: {
+    color: theme.colors.textSecondary,
+    fontSize: 15,
+    fontWeight: "500",
+  },
+  groupListItemTextSelected: {
+    color: theme.colors.accent,
+    fontWeight: "700",
+  },
+  groupDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+  },
+  // Step 4 — Review
   reviewCard: {
     backgroundColor: theme.colors.bgTertiary,
     borderRadius: 12,
     padding: 16,
     marginBottom: 16,
-    gap: 12,
   },
   reviewRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "flex-start",
+    paddingVertical: 6,
   },
   reviewLabel: {
     color: theme.colors.textMuted,
@@ -488,6 +886,18 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: "800",
     fontVariant: ["tabular-nums"],
+  },
+  reviewGroupValue: {
+    flex: 2,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "flex-end",
+    gap: 6,
+  },
+  detailDivider: {
+    height: 1,
+    backgroundColor: theme.colors.border,
+    marginVertical: 2,
   },
   paymentGrid: {
     flexDirection: "row",
@@ -524,6 +934,7 @@ const styles = StyleSheet.create({
     fontSize: 12,
     textAlign: "center",
     lineHeight: 17,
+    marginBottom: 16,
   },
   toggleRow: {
     flexDirection: "row",
@@ -531,7 +942,7 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.bgTertiary,
     borderRadius: 12,
     padding: 16,
-    marginBottom: 14,
+    marginBottom: 10,
     gap: 12,
   },
   toggleInfo: {
@@ -553,6 +964,7 @@ const styles = StyleSheet.create({
     textAlign: "center",
     lineHeight: 18,
   },
+  // Nav
   navRow: {
     flexDirection: "row",
     gap: 10,

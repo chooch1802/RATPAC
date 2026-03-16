@@ -49,6 +49,37 @@ export type Wager = {
   createdAt?: string;
   paymentMethod?: PaymentMethod;
   paymentHandle?: string;
+  sport?: string;
+  betType?: string;
+  groupId?: string;
+  parentWagerId?: string;
+};
+
+export type Group = {
+  id: string;
+  name: string;
+  joinCode: string;
+  avatarColor: string;
+  memberCount: number;
+  myRole: 'admin' | 'member';
+  createdAt: string;
+};
+
+export type GroupMember = {
+  userId: string;
+  handle: string;
+  displayName: string;
+  role: 'admin' | 'member';
+};
+
+export type WagerComment = {
+  id: string;
+  wagerId: string;
+  userId: string;
+  authorHandle: string;
+  authorDisplayName: string;
+  body: string;
+  createdAt: string;
 };
 
 export type UserProfile = {

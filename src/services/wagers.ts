@@ -10,6 +10,10 @@ type CreateWagerInput = {
   isPublic?: boolean;
   paymentMethod?: PaymentMethod;
   paymentHandle?: string;
+  sport?: string;
+  betType?: string;
+  groupId?: string;
+  parentWagerId?: string;
 };
 
 function rowToWager(row: any): Wager {
@@ -25,6 +29,10 @@ function rowToWager(row: any): Wager {
     termsText: row.terms_text ?? undefined,
     paymentMethod: row.payment_method ?? undefined,
     paymentHandle: row.payment_handle ?? undefined,
+    sport: row.sport ?? undefined,
+    betType: row.bet_type ?? undefined,
+    groupId: row.group_id ?? undefined,
+    parentWagerId: row.parent_wager_id ?? undefined,
     createdAt: row.created_at ?? new Date().toISOString(),
   };
 }
@@ -32,7 +40,7 @@ function rowToWager(row: any): Wager {
 const WAGER_SELECT = `
   id, activity, amount, status, created_at,
   opponent_handle, terms_text, winner_handle, declarer_handle,
-  payment_method, payment_handle,
+  payment_method, payment_handle, sport, bet_type, group_id, parent_wager_id,
   opponent:profiles!wagers_opponent_id_fkey(display_name, handle)
 `;
 
@@ -189,9 +197,13 @@ export async function createWagerRecord(input: CreateWagerInput): Promise<Wager>
       is_public: input.isPublic ?? true,
       payment_method: input.paymentMethod ?? null,
       payment_handle: input.paymentHandle ?? null,
+      sport: input.sport ?? null,
+      bet_type: input.betType ?? null,
+      group_id: input.groupId ?? null,
+      parent_wager_id: input.parentWagerId ?? null,
       status: "PENDING",
     })
-    .select("id, activity, amount, status, created_at, opponent_handle, terms_text, payment_method, payment_handle")
+    .select("id, activity, amount, status, created_at, opponent_handle, terms_text, payment_method, payment_handle, sport, bet_type, group_id, parent_wager_id")
     .single();
 
   if (error || !data) return fallback;
@@ -215,8 +227,23 @@ export async function createWagerRecord(input: CreateWagerInput): Promise<Wager>
     termsText: data.terms_text ?? undefined,
     paymentMethod: data.payment_method ?? undefined,
     paymentHandle: data.payment_handle ?? undefined,
+    sport: data.sport ?? undefined,
+    betType: data.bet_type ?? undefined,
+    groupId: data.group_id ?? undefined,
+    parentWagerId: data.parent_wager_id ?? undefined,
     createdAt: data.created_at ?? new Date().toISOString(),
   };
+}
+
+export async function fetchSideBets(parentWagerId: string): Promise<Wager[]> {
+  if (!supabase) return [];
+  const { data, error } = await supabase
+    .from("wagers")
+    .select(WAGER_SELECT)
+    .eq("parent_wager_id", parentWagerId)
+    .order("created_at", { ascending: false });
+  if (error || !data) return [];
+  return data.map(rowToWager);
 }
 
 /** Step 1: Declare a result — transitions ACTIVE → AWAITING_RESULT */
