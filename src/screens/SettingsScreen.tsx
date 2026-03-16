@@ -130,7 +130,7 @@ export default function SettingsScreen({ navigation }: { navigation: any }) {
             />
           ) : (
             <SettingsRow
-              label="Subscribe — $4.99/mo"
+              label="Subscribe — $1.99/week · 7 days free"
               onPress={() => navigation.goBack()}
             />
           )}

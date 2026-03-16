@@ -34,8 +34,8 @@ export function PaywallModal() {
     }
   }, [showPaywall]);
 
-  const priceString = pkg?.product.priceString ?? "$4.99";
-  const hasFreeTrial = !!pkg?.product.introPrice;
+  const priceString = pkg?.product.priceString ?? "$1.99";
+  const hasFreeTrial = pkg ? !!pkg.product.introPrice : true;
 
   async function onSubscribe() {
     if (!pkg) return;
@@ -77,7 +77,7 @@ export function PaywallModal() {
 
           <Text style={styles.title}>Ratpac Pro</Text>
           <View style={styles.trialBadge}>
-            <Text style={styles.trialBadgeText}>First month free</Text>
+            <Text style={styles.trialBadgeText}>7 days free — then $1.99/week</Text>
           </View>
 
           <View style={styles.featureList}>
@@ -99,11 +99,11 @@ export function PaywallModal() {
             ) : (
               <>
                 <Text style={styles.subscribeBtnText}>
-                  {hasFreeTrial ? "Start free trial" : `Subscribe — ${priceString} / month`}
+                  {hasFreeTrial ? "Start 7-day free trial" : `Subscribe — ${priceString}/week`}
                 </Text>
                 <Text style={styles.subscribeBtnSub}>
                   {hasFreeTrial
-                    ? `Free for 1 month, then ${priceString}/mo · Cancel anytime`
+                    ? `Free for 7 days, then ${priceString}/week · Cancel anytime`
                     : "Cancel anytime"}
                 </Text>
               </>
