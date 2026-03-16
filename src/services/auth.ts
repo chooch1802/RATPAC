@@ -83,6 +83,7 @@ export async function updateProfile(
   handle: string,
   isPrivate: boolean,
   dob?: string,
+  displayName?: string,
 ): Promise<{ ok: boolean; message: string }> {
   if (!supabase) return { ok: false, message: "Not configured." };
   const { data: { user } } = await supabase.auth.getUser();
@@ -92,7 +93,7 @@ export async function updateProfile(
     .from("profiles")
     .update({
       handle,
-      display_name: handle,
+      display_name: displayName ?? handle,
       is_private: isPrivate,
       ...(dob ? { dob, age_verified: true, terms_accepted_at: new Date().toISOString() } : {}),
       updated_at: new Date().toISOString(),

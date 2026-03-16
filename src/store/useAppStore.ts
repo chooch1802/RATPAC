@@ -7,6 +7,7 @@ import {
   createWagerRecord,
   loadInitialData,
   loadNotifications,
+  loadPublicFeed,
   markAllNotificationsAsRead,
   markNotificationAsRead,
   reactToFeedPost,
@@ -46,6 +47,7 @@ type AppState = {
   user: UserProfile;
   onboardingDraft: OnboardingDraft;
   feed: FeedPost[];
+  forYouFeed: FeedPost[];
   wagers: Wager[];
   notifications: Notification[];
   followingHandles: string[];
@@ -56,8 +58,16 @@ type AppState = {
   allowedActivities: Activity[];
   gamblingSettings: GamblingSettings | null;
   wageredTotals: WageredTotals;
+  notificationsEnabled: boolean;
+  challengeAlertsEnabled: boolean;
+  settlementAlertsEnabled: boolean;
 
   setAuth: (next: boolean) => void;
+  setNotificationsEnabled: (next: boolean) => void;
+  setChallengeAlertsEnabled: (next: boolean) => void;
+  setSettlementAlertsEnabled: (next: boolean) => void;
+  updateUserProfile: (handle: string, displayName: string) => Promise<{ ok: boolean; message: string }>;
+  loadForYouFeed: () => Promise<void>;
   setDraftHandle: (handle: string) => void;
   setDraftPrivacy: (isPrivate: boolean) => void;
   setDraftDob: (dob: string) => void;
@@ -99,6 +109,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
   onboardingDraft: { handle: "", isPrivate: false, dob: "" },
   feed: feedPosts,
+  forYouFeed: feedPosts,
   wagers: starterWagers,
   notifications: mockNotifications,
   followingHandles: [],
@@ -109,8 +120,31 @@ export const useAppStore = create<AppState>((set, get) => ({
   allowedActivities: activities,
   gamblingSettings: null,
   wageredTotals: { daily: 0, weekly: 0, monthly: 0 },
+  notificationsEnabled: true,
+  challengeAlertsEnabled: true,
+  settlementAlertsEnabled: true,
 
   setAuth: (next) => set({ isAuthed: next }),
+
+  setNotificationsEnabled: (next) => set({ notificationsEnabled: next }),
+  setChallengeAlertsEnabled: (next) => set({ challengeAlertsEnabled: next }),
+  setSettlementAlertsEnabled: (next) => set({ settlementAlertsEnabled: next }),
+
+  updateUserProfile: async (handle, displayName) => {
+    const state = get();
+    const normalizedHandle = handle.startsWith("@") ? handle : `@${handle}`;
+    const result = await updateProfile(normalizedHandle, state.user.isPrivate, undefined, displayName);
+    if (result.ok) {
+      set((s) => ({ user: { ...s.user, handle: normalizedHandle, displayName } }));
+    }
+    return result;
+  },
+
+  loadForYouFeed: async () => {
+    const posts = await loadPublicFeed();
+    set({ forYouFeed: posts });
+  },
+
   setDraftHandle: (handle) =>
     set((s) => ({ onboardingDraft: { ...s.onboardingDraft, handle } })),
   setDraftPrivacy: (isPrivate) =>

@@ -19,8 +19,10 @@ type FeedTab = "following" | "foryou";
 
 export default function FeedScreen({ navigation }: { navigation: any }) {
   const feed = useAppStore((s) => s.feed);
+  const forYouFeed = useAppStore((s) => s.forYouFeed);
   const user = useAppStore((s) => s.user);
   const hydrateFromBackend = useAppStore((s) => s.hydrateFromBackend);
+  const loadForYouFeed = useAppStore((s) => s.loadForYouFeed);
   const [activeTab, setActiveTab] = useState<FeedTab>("following");
   const [refreshing, setRefreshing] = useState(false);
 
@@ -38,7 +40,11 @@ export default function FeedScreen({ navigation }: { navigation: any }) {
 
   async function onRefresh() {
     setRefreshing(true);
-    await hydrateFromBackend();
+    if (activeTab === "foryou") {
+      await loadForYouFeed();
+    } else {
+      await hydrateFromBackend();
+    }
     setRefreshing(false);
   }
 
@@ -156,13 +162,31 @@ export default function FeedScreen({ navigation }: { navigation: any }) {
           }
         />
       ) : (
-        <View style={styles.comingSoon}>
-          <Ionicons name="telescope-outline" size={48} color={theme.colors.textMuted} />
-          <Text style={styles.comingSoonTitle}>For You feed</Text>
-          <Text style={styles.comingSoonDesc}>
-            Discover popular wagers and trending activity from the community. Coming soon.
-          </Text>
-        </View>
+        <FlatList
+          data={forYouFeed}
+          keyExtractor={(item) => item.id}
+          renderItem={({ item }) => (
+            <WagerCard post={item} onPress={() => handleCardPress(item)} />
+          )}
+          contentContainerStyle={styles.listContent}
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              tintColor={theme.colors.accent}
+            />
+          }
+          ListEmptyComponent={
+            <View style={styles.emptyState}>
+              <Ionicons name="flame-outline" size={48} color={theme.colors.textMuted} />
+              <Text style={styles.emptyTitle}>Nothing trending yet</Text>
+              <Text style={styles.emptyDesc}>
+                Public wagers from the community will appear here.
+              </Text>
+            </View>
+          }
+        />
       )}
     </SafeAreaView>
   );

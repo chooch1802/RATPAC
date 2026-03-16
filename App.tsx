@@ -17,6 +17,7 @@ import ProfileScreen from "./src/screens/ProfileScreen";
 import SearchScreen from "./src/screens/SearchScreen";
 import SettingsScreen from "./src/screens/SettingsScreen";
 import SignInScreen from "./src/screens/SignInScreen";
+import EditProfileScreen from "./src/screens/EditProfileScreen";
 import GamblingControlsScreen from "./src/screens/GamblingControlsScreen";
 import WagerDetailScreen from "./src/screens/WagerDetailScreen";
 import WagersScreen from "./src/screens/WagersScreen";
@@ -116,6 +117,11 @@ function AppNavigator() {
         component={GamblingControlsScreen}
         options={{ presentation: "card" }}
       />
+      <AppStack.Screen
+        name="EditProfile"
+        component={EditProfileScreen}
+        options={{ presentation: "card" }}
+      />
     </AppStack.Navigator>
   );
 }
@@ -158,14 +164,16 @@ export default function App() {
   const upsertWager = useAppStore((s) => s.upsertWager);
   const upsertNotification = useAppStore((s) => s.upsertNotification);
   const patchFeedPost = useAppStore((s) => s.patchFeedPost);
+  const loadForYouFeed = useAppStore((s) => s.loadForYouFeed);
 
   // Re-hydrate and register push token whenever the user becomes authenticated
   useEffect(() => {
     if (isAuthed) {
       hydrateFromBackend();
       registerAndSaveToken();
+      loadForYouFeed();
     }
-  }, [isAuthed, hydrateFromBackend]);
+  }, [isAuthed, hydrateFromBackend, loadForYouFeed]);
 
   useEffect(() => {
     async function bootstrap() {

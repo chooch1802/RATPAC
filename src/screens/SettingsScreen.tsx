@@ -1,6 +1,7 @@
 import React from "react";
 import {
   Alert,
+  Linking,
   Pressable,
   SafeAreaView,
   ScrollView,
@@ -9,7 +10,7 @@ import {
   Text,
   View,
 } from "react-native";
-import { Linking } from "react-native";
+import { registerAndSaveToken, removeDeviceToken, registerForPushNotifications } from "../services/pushNotifications";
 import { useAppStore } from "../store/useAppStore";
 import { theme } from "../theme";
 
@@ -47,10 +48,30 @@ function SectionHeader({ title }: { title: string }) {
   );
 }
 
+const PRIVACY_POLICY_URL = "https://github.com/chooch1802/RATPAC/blob/main/docs/privacy-policy.md";
+const TERMS_URL = "https://github.com/chooch1802/RATPAC/blob/main/docs/privacy-policy.md";
+const HELP_EMAIL = "mailto:support@ratpac.app";
+
 export default function SettingsScreen({ navigation }: { navigation: any }) {
   const user = useAppStore((s) => s.user);
   const setDraftPrivacy = useAppStore((s) => s.setDraftPrivacy);
   const setAuth = useAppStore((s) => s.setAuth);
+  const notificationsEnabled = useAppStore((s) => s.notificationsEnabled);
+  const challengeAlertsEnabled = useAppStore((s) => s.challengeAlertsEnabled);
+  const settlementAlertsEnabled = useAppStore((s) => s.settlementAlertsEnabled);
+  const setNotificationsEnabled = useAppStore((s) => s.setNotificationsEnabled);
+  const setChallengeAlertsEnabled = useAppStore((s) => s.setChallengeAlertsEnabled);
+  const setSettlementAlertsEnabled = useAppStore((s) => s.setSettlementAlertsEnabled);
+
+  async function onToggleNotifications(val: boolean) {
+    setNotificationsEnabled(val);
+    if (val) {
+      await registerAndSaveToken();
+    } else {
+      const token = await registerForPushNotifications();
+      if (token) await removeDeviceToken(token);
+    }
+  }
 
   function onSignOut() {
     Alert.alert("Sign out", "Are you sure you want to sign out?", [
@@ -90,7 +111,7 @@ export default function SettingsScreen({ navigation }: { navigation: any }) {
             }
           />
           <View style={styles.divider} />
-          <SettingsRow label="Edit profile" onPress={() => {}} />
+          <SettingsRow label="Edit profile" onPress={() => navigation.navigate("EditProfile")} />
         </View>
 
         {/* Subscription */}
@@ -122,9 +143,10 @@ export default function SettingsScreen({ navigation }: { navigation: any }) {
             label="Push notifications"
             right={
               <Switch
-                value={true}
+                value={notificationsEnabled}
+                onValueChange={onToggleNotifications}
                 trackColor={{ false: theme.colors.bgTertiary, true: theme.colors.accent }}
-                thumbColor="#001B10"
+                thumbColor={notificationsEnabled ? "#001B10" : theme.colors.textMuted}
               />
             }
           />
@@ -133,9 +155,11 @@ export default function SettingsScreen({ navigation }: { navigation: any }) {
             label="Challenge alerts"
             right={
               <Switch
-                value={true}
+                value={notificationsEnabled && challengeAlertsEnabled}
+                onValueChange={setChallengeAlertsEnabled}
+                disabled={!notificationsEnabled}
                 trackColor={{ false: theme.colors.bgTertiary, true: theme.colors.accent }}
-                thumbColor="#001B10"
+                thumbColor={challengeAlertsEnabled && notificationsEnabled ? "#001B10" : theme.colors.textMuted}
               />
             }
           />
@@ -144,9 +168,11 @@ export default function SettingsScreen({ navigation }: { navigation: any }) {
             label="Settlement alerts"
             right={
               <Switch
-                value={true}
+                value={notificationsEnabled && settlementAlertsEnabled}
+                onValueChange={setSettlementAlertsEnabled}
+                disabled={!notificationsEnabled}
                 trackColor={{ false: theme.colors.bgTertiary, true: theme.colors.accent }}
-                thumbColor="#001B10"
+                thumbColor={settlementAlertsEnabled && notificationsEnabled ? "#001B10" : theme.colors.textMuted}
               />
             }
           />
@@ -164,11 +190,11 @@ export default function SettingsScreen({ navigation }: { navigation: any }) {
         {/* Help */}
         <SectionHeader title="Support" />
         <View style={styles.section}>
-          <SettingsRow label="Help & FAQ" onPress={() => {}} />
+          <SettingsRow label="Help & FAQ" onPress={() => Linking.openURL(HELP_EMAIL)} />
           <View style={styles.divider} />
-          <SettingsRow label="Privacy Policy" onPress={() => {}} />
+          <SettingsRow label="Privacy Policy" onPress={() => Linking.openURL(PRIVACY_POLICY_URL)} />
           <View style={styles.divider} />
-          <SettingsRow label="Terms of Service" onPress={() => {}} />
+          <SettingsRow label="Terms of Service" onPress={() => Linking.openURL(TERMS_URL)} />
         </View>
 
         {/* Danger zone */}

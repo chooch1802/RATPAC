@@ -125,6 +125,34 @@ export async function loadInitialData(): Promise<{ feed: FeedPost[]; wagers: Wag
   return { feed, wagers };
 }
 
+export async function loadPublicFeed(): Promise<FeedPost[]> {
+  if (!supabase) return feedPosts;
+
+  const { data, error } = await supabase
+    .from("feed_posts")
+    .select(`
+      id, type, is_public, reactions, comment_count, created_at,
+      wager:wagers!feed_posts_wager_id_fkey(
+        id, activity, amount, status, opponent_handle, winner_handle, terms_text,
+        creator:profiles!wagers_creator_id_fkey(id, handle, display_name),
+        opponent:profiles!wagers_opponent_id_fkey(handle, display_name)
+      )
+    `)
+    .eq("is_public", true)
+    .order("created_at", { ascending: false })
+    .limit(50);
+
+  if (error || !data?.length) return feedPosts;
+
+  const posts = data.map(rowToFeedPost);
+  return posts.sort((a, b) => {
+    const totalA = a.reactions.fire + a.reactions.hundred + a.reactions.laughing + a.reactions.shocked;
+    const totalB = b.reactions.fire + b.reactions.hundred + b.reactions.laughing + b.reactions.shocked;
+    if (totalB !== totalA) return totalB - totalA;
+    return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+  });
+}
+
 export async function createWagerRecord(input: CreateWagerInput): Promise<Wager> {
   const fallback: Wager = {
     id: `w_${Date.now()}`,
