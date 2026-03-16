@@ -1,7 +1,10 @@
 import React, { useEffect, useState } from "react";
 import {
+  ActionSheetIOS,
   ActivityIndicator,
+  Alert,
   Linking,
+  Platform,
   Pressable,
   SafeAreaView,
   ScrollView,
@@ -116,6 +119,24 @@ export default function WagerDetailScreen({
   const setCreateWagerVisible = useAppStore((s) => s.setCreateWagerVisible);
   const setCreateWagerContext = useAppStore((s) => s.setCreateWagerContext);
 
+  function handleReport() {
+    const report = () =>
+      Linking.openURL(
+        `mailto:support@ratpac.app?subject=Report%20wager%20${wagerId}&body=I%20would%20like%20to%20report%20this%20wager%20for%20the%20following%20reason%3A%0A%0A`
+      );
+    if (Platform.OS === "ios") {
+      ActionSheetIOS.showActionSheetWithOptions(
+        { options: ["Cancel", "Report this wager"], cancelButtonIndex: 0, destructiveButtonIndex: 1 },
+        (i) => { if (i === 1) report(); }
+      );
+    } else {
+      Alert.alert("Report", "Report this wager to Ratpac support?", [
+        { text: "Cancel", style: "cancel" },
+        { text: "Report", style: "destructive", onPress: report },
+      ]);
+    }
+  }
+
   const [challengeActionLoading, setChallengeActionLoading] = useState<
     "" | "accept" | "decline"
   >("");
@@ -211,6 +232,9 @@ export default function WagerDetailScreen({
           <Text style={styles.backBtnText}>←</Text>
         </Pressable>
         <Text style={styles.headerTitle}>Wager Detail</Text>
+        <Pressable style={styles.reportBtn} onPress={handleReport}>
+          <Text style={styles.reportBtnText}>⋯</Text>
+        </Pressable>
       </View>
 
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
@@ -581,6 +605,23 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     borderBottomWidth: 1,
     borderBottomColor: theme.colors.border,
+  },
+  reportBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: theme.colors.bgSecondary,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    alignItems: "center",
+    justifyContent: "center",
+    marginLeft: "auto",
+  },
+  reportBtnText: {
+    color: theme.colors.textMuted,
+    fontSize: 18,
+    fontWeight: "700",
+    lineHeight: 20,
   },
   backBtn: {
     width: 36,

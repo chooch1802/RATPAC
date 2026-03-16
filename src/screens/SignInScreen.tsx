@@ -1,3 +1,4 @@
+import * as AppleAuthentication from "expo-apple-authentication";
 import React, { useState } from "react";
 import {
   Image,
@@ -135,17 +136,16 @@ export default function SignInScreen() {
               <View style={styles.divider} />
             </View>
 
-            {/* Apple */}
-            <Pressable
-              style={styles.socialBtn}
-              onPress={() => onOAuth("apple")}
-              disabled={isOAuthLoading.length > 0}
-            >
-              <Text style={styles.socialBtnIcon}>🍎</Text>
-              <Text style={styles.socialBtnText}>
-                {isOAuthLoading === "apple" ? "Connecting..." : "Continue with Apple"}
-              </Text>
-            </Pressable>
+            {/* Apple — must use official button on iOS (App Store guideline 4.8) */}
+            {Platform.OS === "ios" ? (
+              <AppleAuthentication.AppleAuthenticationButton
+                buttonType={AppleAuthentication.AppleAuthenticationButtonType.CONTINUE}
+                buttonStyle={AppleAuthentication.AppleAuthenticationButtonStyle.WHITE}
+                cornerRadius={12}
+                style={styles.appleBtn}
+                onPress={() => onOAuth("apple")}
+              />
+            ) : null}
 
             {/* Google */}
             <Pressable
@@ -282,6 +282,11 @@ const styles = StyleSheet.create({
     color: theme.colors.textMuted,
     fontSize: 13,
     fontWeight: "500",
+  },
+  appleBtn: {
+    height: 48,
+    borderRadius: 12,
+    marginBottom: 10,
   },
   socialBtn: {
     flexDirection: "row",

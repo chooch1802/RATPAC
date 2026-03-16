@@ -15,8 +15,10 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.ratpac.app",
+      "usesAppleSignIn": true,
       "infoPlist": {
-        "ITSAppUsesNonExemptEncryption": false
+        "ITSAppUsesNonExemptEncryption": false,
+        "NSUserTrackingUsageDescription": "We use your data only to personalise your Ratpac experience and are never sold to third parties."
       }
     },
     "android": {
