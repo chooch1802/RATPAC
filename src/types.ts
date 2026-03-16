@@ -93,6 +93,8 @@ export type UserProfile = {
   activeWagerCount: number;
   followerCount: number;
   followingCount: number;
+  avatarUrl?: string;
+  bio?: string;
 };
 
 export type NotificationType =

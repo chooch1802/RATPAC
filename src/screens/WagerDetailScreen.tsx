@@ -1,8 +1,9 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   ActionSheetIOS,
   ActivityIndicator,
   Alert,
+  KeyboardAvoidingView,
   Linking,
   Platform,
   Pressable,
@@ -10,12 +11,13 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from "react-native";
-import { fetchSideBets, fetchWagerById } from "../services/wagers";
+import { fetchSideBets, fetchWagerById, fetchComments, addComment } from "../services/wagers";
 import { useAppStore } from "../store/useAppStore";
 import { theme } from "../theme";
-import { PaymentMethod, Wager, WagerStatus } from "../types";
+import { PaymentMethod, Wager, WagerComment, WagerStatus } from "../types";
 
 const SPORT_EMOJI: Record<string, string> = {
   golf: "⛳",
@@ -146,6 +148,10 @@ export default function WagerDetailScreen({
   const [isFetching, setIsFetching] = useState(false);
   const [sideBets, setSideBets] = useState<Wager[]>([]);
   const [sideBetsLoading, setSideBetsLoading] = useState(false);
+  const [comments, setComments] = useState<WagerComment[]>([]);
+  const [commentsLoading, setCommentsLoading] = useState(false);
+  const [commentText, setCommentText] = useState("");
+  const [postingComment, setPostingComment] = useState(false);
 
   const storeWager = wagers.find((w) => w.id === wagerId);
 
@@ -176,6 +182,31 @@ export default function WagerDetailScreen({
         .finally(() => setSideBetsLoading(false));
     }
   }, [storeWager?.id, storeWager?.status]);
+
+  // Load comments
+  useEffect(() => {
+    if (!wagerId) return;
+    setCommentsLoading(true);
+    fetchComments(wagerId)
+      .then(setComments)
+      .finally(() => setCommentsLoading(false));
+  }, [wagerId]);
+
+  async function handlePostComment() {
+    const body = commentText.trim();
+    if (!body) return;
+    setPostingComment(true);
+    const result = await addComment(wagerId, body);
+    if (result.ok) {
+      setCommentText("");
+      // Re-fetch comments
+      const updated = await fetchComments(wagerId);
+      setComments(updated);
+    } else {
+      Alert.alert("Error", result.message);
+    }
+    setPostingComment(false);
+  }
 
   const wager = storeWager ?? null;
 
@@ -581,6 +612,60 @@ export default function WagerDetailScreen({
             )}
           </View>
         )}
+
+        {/* Comments */}
+        <View style={styles.commentsCard}>
+          <Text style={styles.actionsTitle}>Comments</Text>
+          {commentsLoading ? (
+            <ActivityIndicator color={theme.colors.accent} style={{ marginVertical: 12 }} />
+          ) : comments.length === 0 ? (
+            <Text style={styles.commentsEmpty}>No comments yet. Be the first!</Text>
+          ) : (
+            <View style={styles.commentsList}>
+              {comments.map((c) => (
+                <View key={c.id} style={styles.commentRow}>
+                  <View style={styles.commentAvatar}>
+                    <Text style={styles.commentAvatarText}>
+                      {c.authorHandle.replace("@", "")[0]?.toUpperCase() ?? "?"}
+                    </Text>
+                  </View>
+                  <View style={styles.commentBody}>
+                    <View style={styles.commentHeader}>
+                      <Text style={styles.commentHandle}>{c.authorHandle}</Text>
+                      <Text style={styles.commentTime}>{timeAgo(c.createdAt)}</Text>
+                    </View>
+                    <Text style={styles.commentText}>{c.body}</Text>
+                  </View>
+                </View>
+              ))}
+            </View>
+          )}
+
+          <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined}>
+            <View style={styles.commentInputRow}>
+              <TextInput
+                style={styles.commentInput}
+                value={commentText}
+                onChangeText={setCommentText}
+                placeholder="Add a comment…"
+                placeholderTextColor={theme.colors.textMuted}
+                multiline
+                maxLength={500}
+              />
+              <Pressable
+                style={[styles.commentSendBtn, (!commentText.trim() || postingComment) && styles.commentSendBtnDisabled]}
+                onPress={handlePostComment}
+                disabled={!commentText.trim() || postingComment}
+              >
+                {postingComment ? (
+                  <ActivityIndicator size="small" color="#001B10" />
+                ) : (
+                  <Text style={styles.commentSendBtnText}>Send</Text>
+                )}
+              </Pressable>
+            </View>
+          </KeyboardAvoidingView>
+        </View>
       </ScrollView>
     </SafeAreaView>
   );
@@ -945,5 +1030,100 @@ const styles = StyleSheet.create({
     fontSize: 9,
     fontWeight: "700",
     letterSpacing: 0.4,
+  },
+  commentsCard: {
+    backgroundColor: theme.colors.bgSecondary,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
+    gap: 12,
+  },
+  commentsEmpty: {
+    color: theme.colors.textMuted,
+    fontSize: 13,
+    lineHeight: 18,
+  },
+  commentsList: {
+    gap: 12,
+  },
+  commentRow: {
+    flexDirection: "row",
+    gap: 10,
+  },
+  commentAvatar: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: theme.colors.bgTertiary,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    alignItems: "center",
+    justifyContent: "center",
+    flexShrink: 0,
+  },
+  commentAvatarText: {
+    color: theme.colors.textPrimary,
+    fontWeight: "700",
+    fontSize: 12,
+  },
+  commentBody: {
+    flex: 1,
+  },
+  commentHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginBottom: 3,
+  },
+  commentHandle: {
+    color: theme.colors.textSecondary,
+    fontWeight: "700",
+    fontSize: 12,
+  },
+  commentTime: {
+    color: theme.colors.textMuted,
+    fontSize: 11,
+  },
+  commentText: {
+    color: theme.colors.textPrimary,
+    fontSize: 14,
+    lineHeight: 19,
+  },
+  commentInputRow: {
+    flexDirection: "row",
+    gap: 8,
+    alignItems: "flex-end",
+    marginTop: 4,
+  },
+  commentInput: {
+    flex: 1,
+    backgroundColor: theme.colors.bgTertiary,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    color: theme.colors.textPrimary,
+    fontSize: 14,
+    maxHeight: 100,
+  },
+  commentSendBtn: {
+    backgroundColor: theme.colors.accent,
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    alignItems: "center",
+    justifyContent: "center",
+    minWidth: 58,
+  },
+  commentSendBtnDisabled: {
+    opacity: 0.4,
+  },
+  commentSendBtnText: {
+    color: "#001B10",
+    fontWeight: "700",
+    fontSize: 13,
   },
 });

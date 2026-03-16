@@ -651,6 +651,54 @@ export async function subscribeToFeedPostChanges(
   };
 }
 
+export async function fetchComments(wagerId: string): Promise<import("../types").WagerComment[]> {
+  if (!supabase) return [];
+
+  const { data, error } = await supabase
+    .from("wager_comments")
+    .select("id, wager_id, user_id, author_handle, author_display_name, body, created_at")
+    .eq("wager_id", wagerId)
+    .order("created_at", { ascending: true });
+
+  if (error || !data) return [];
+
+  return data.map((row: any) => ({
+    id: String(row.id),
+    wagerId: String(row.wager_id),
+    userId: String(row.user_id),
+    authorHandle: row.author_handle ?? "@unknown",
+    authorDisplayName: row.author_display_name ?? row.author_handle ?? "Unknown",
+    body: row.body ?? "",
+    createdAt: row.created_at ?? new Date().toISOString(),
+  }));
+}
+
+export async function addComment(
+  wagerId: string,
+  body: string
+): Promise<{ ok: boolean; message: string }> {
+  if (!supabase) return { ok: false, message: "Not configured." };
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { ok: false, message: "Not signed in." };
+
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("handle, display_name")
+    .eq("id", user.id)
+    .maybeSingle();
+
+  const { error } = await supabase.from("wager_comments").insert({
+    wager_id: wagerId,
+    user_id: user.id,
+    author_handle: profile?.handle ?? "@unknown",
+    author_display_name: profile?.display_name ?? profile?.handle ?? "Unknown",
+    body: body.trim(),
+  });
+
+  if (error) return { ok: false, message: error.message };
+  return { ok: true, message: "Comment posted." };
+}
+
 export async function subscribeToWagerChanges(
   onWagerChanged: (wager: Wager) => void
 ): Promise<(() => void) | null> {

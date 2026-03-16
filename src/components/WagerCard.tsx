@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Image, Pressable, StyleSheet, Text, View } from "react-native";
 import { useAppStore } from "../store/useAppStore";
 import { theme } from "../theme";
 import { FeedPost, Reactions, WagerStatus } from "../types";
@@ -14,10 +14,20 @@ function timeAgo(dateStr: string): string {
   return `${Math.floor(hours / 24)}d`;
 }
 
-function Avatar({ handle, size = 32 }: { handle: string; size?: number }) {
+function Avatar({ handle, size = 32, imageUrl }: { handle: string; size?: number; imageUrl?: string }) {
   const initial = handle.replace("@", "")[0]?.toUpperCase() ?? "?";
   const palette = ["#7B5EA7", "#C0392B", "#2980B9", "#D35400", "#27AE60", "#8E44AD", "#1A6B4A"];
   const idx = (handle.charCodeAt(1) ?? 0) % palette.length;
+
+  if (imageUrl) {
+    return (
+      <Image
+        source={{ uri: imageUrl }}
+        style={[styles.avatar, { width: size, height: size, borderRadius: size / 2 }]}
+      />
+    );
+  }
+
   return (
     <View
       style={[
@@ -71,9 +81,11 @@ function ActivityPill({ activity }: { activity: string }) {
 type WagerCardProps = {
   post: FeedPost;
   onPress?: () => void;
+  onAuthorPress?: (handle: string) => void;
+  onCommentPress?: () => void;
 };
 
-export function WagerCard({ post, onPress }: WagerCardProps) {
+export function WagerCard({ post, onPress, onAuthorPress, onCommentPress }: WagerCardProps) {
   const toggleReaction = useAppStore((s) => s.toggleReaction);
   const toggleFollowForHandle = useAppStore((s) => s.toggleFollowForHandle);
   const respondToChallenge = useAppStore((s) => s.respondToChallenge);
@@ -148,13 +160,19 @@ export function WagerCard({ post, onPress }: WagerCardProps) {
 
         {/* Header */}
         <View style={styles.header}>
-          <Avatar handle={post.authorHandle} size={34} />
-          <View style={styles.headerMeta}>
-            <Text style={styles.displayName}>{post.authorDisplayName}</Text>
-            <Text style={styles.handle}>
-              {post.authorHandle} · {timeAgo(post.createdAt)}
-            </Text>
-          </View>
+          <Pressable
+            style={styles.authorRow}
+            onPress={onAuthorPress ? () => onAuthorPress(post.authorHandle) : undefined}
+            disabled={!onAuthorPress}
+          >
+            <Avatar handle={post.authorHandle} size={34} />
+            <View style={styles.headerMeta}>
+              <Text style={styles.displayName}>{post.authorDisplayName}</Text>
+              <Text style={styles.handle}>
+                {post.authorHandle} · {timeAgo(post.createdAt)}
+              </Text>
+            </View>
+          </Pressable>
           <View style={styles.headerRight}>
             <ActivityPill activity={post.activity} />
             {post.authorHandle !== user.handle && (
@@ -239,9 +257,12 @@ export function WagerCard({ post, onPress }: WagerCardProps) {
                 </Pressable>
               );
             })}
-            <View style={styles.reactionBtn}>
+            <Pressable
+              style={styles.reactionBtn}
+              onPress={onCommentPress ?? onPress}
+            >
               <Text style={styles.reactionText}>💬{post.comments > 0 ? ` ${post.comments}` : ""}</Text>
-            </View>
+            </Pressable>
           </View>
         </View>
       </View>
@@ -323,6 +344,12 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginBottom: 12,
     gap: 10,
+  },
+  authorRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    flex: 1,
   },
   avatar: {
     alignItems: "center",

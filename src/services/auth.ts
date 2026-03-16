@@ -53,6 +53,8 @@ export async function loadProfile(): Promise<{
   totalWagered: number;
   followerCount: number;
   followingCount: number;
+  bio?: string;
+  avatarUrl?: string;
 } | null> {
   if (!supabase) return null;
   const { data: { user } } = await supabase.auth.getUser();
@@ -60,7 +62,7 @@ export async function loadProfile(): Promise<{
 
   const { data, error } = await supabase
     .from("profiles")
-    .select("handle, display_name, is_private, is_subscribed, wins, losses, total_wagered, follower_count, following_count")
+    .select("handle, display_name, is_private, is_subscribed, wins, losses, total_wagered, follower_count, following_count, bio, avatar_url")
     .eq("id", user.id)
     .single();
 
@@ -76,6 +78,8 @@ export async function loadProfile(): Promise<{
     totalWagered: Number(data.total_wagered),
     followerCount: data.follower_count,
     followingCount: data.following_count,
+    bio: data.bio ?? undefined,
+    avatarUrl: data.avatar_url ?? undefined,
   };
 }
 
@@ -84,6 +88,8 @@ export async function updateProfile(
   isPrivate: boolean,
   dob?: string,
   displayName?: string,
+  bio?: string,
+  avatarUrl?: string,
 ): Promise<{ ok: boolean; message: string }> {
   if (!supabase) return { ok: false, message: "Not configured." };
   const { data: { user } } = await supabase.auth.getUser();
@@ -96,6 +102,8 @@ export async function updateProfile(
       display_name: displayName ?? handle,
       is_private: isPrivate,
       ...(dob ? { dob, age_verified: true, terms_accepted_at: new Date().toISOString() } : {}),
+      ...(bio !== undefined ? { bio } : {}),
+      ...(avatarUrl !== undefined ? { avatar_url: avatarUrl } : {}),
       updated_at: new Date().toISOString(),
     })
     .eq("id", user.id);
@@ -166,6 +174,10 @@ export async function hasActiveSession(): Promise<boolean> {
   if (!supabase) return false;
   const { data } = await supabase.auth.getSession();
   return Boolean(data.session);
+}
+
+export async function checkAndExpireTrials(): Promise<void> {
+  // No-op stub — trial expiration handled server-side
 }
 
 export async function syncProfileForCurrentUser(): Promise<void> {

@@ -93,7 +93,13 @@ export default function FeedScreen({ navigation }: { navigation: any }) {
 
       {/* Challenge cards first */}
       {pendingChallenges.map((post) => (
-        <WagerCard key={post.id} post={post} onPress={() => handleCardPress(post)} />
+        <WagerCard
+          key={post.id}
+          post={post}
+          onPress={() => handleCardPress(post)}
+          onAuthorPress={(handle) => navigation.navigate("UserProfile", { handle })}
+          onCommentPress={() => handleCardPress(post)}
+        />
       ))}
     </>
   );
@@ -137,7 +143,12 @@ export default function FeedScreen({ navigation }: { navigation: any }) {
           data={sortedFeed}
           keyExtractor={(item) => item.id}
           renderItem={({ item }) => (
-            <WagerCard post={item} onPress={() => handleCardPress(item)} />
+            <WagerCard
+              post={item}
+              onPress={() => handleCardPress(item)}
+              onAuthorPress={(handle) => navigation.navigate("UserProfile", { handle })}
+              onCommentPress={() => handleCardPress(item)}
+            />
           )}
           ListHeaderComponent={<ListHeader />}
           contentContainerStyle={styles.listContent}
@@ -166,7 +177,12 @@ export default function FeedScreen({ navigation }: { navigation: any }) {
           data={forYouFeed}
           keyExtractor={(item) => item.id}
           renderItem={({ item }) => (
-            <WagerCard post={item} onPress={() => handleCardPress(item)} />
+            <WagerCard
+              post={item}
+              onPress={() => handleCardPress(item)}
+              onAuthorPress={(handle) => navigation.navigate("UserProfile", { handle })}
+              onCommentPress={() => handleCardPress(item)}
+            />
           )}
           contentContainerStyle={styles.listContent}
           showsVerticalScrollIndicator={false}

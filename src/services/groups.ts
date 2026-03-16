@@ -120,6 +120,21 @@ export async function createGroup(name: string): Promise<Group | null> {
   };
 }
 
+export async function leaveGroup(groupId: string): Promise<{ ok: boolean; message: string }> {
+  if (!supabase) return { ok: false, message: 'Not configured.' };
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { ok: false, message: 'Not signed in.' };
+
+  const { error } = await supabase
+    .from('group_members')
+    .delete()
+    .eq('group_id', groupId)
+    .eq('user_id', user.id);
+
+  if (error) return { ok: false, message: error.message };
+  return { ok: true, message: 'Left group.' };
+}
+
 export async function joinGroupByCode(code: string): Promise<{ ok: boolean; group?: Group; message: string }> {
   if (!supabase) return { ok: false, message: 'Not configured.' };
   const { data: { user } } = await supabase.auth.getUser();

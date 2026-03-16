@@ -2,6 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import React, { useState } from "react";
 import {
   FlatList,
+  Image,
   Linking,
   Pressable,
   SafeAreaView,
@@ -15,10 +16,20 @@ import { useAppStore } from "../store/useAppStore";
 import { theme } from "../theme";
 import { Wager } from "../types";
 
-function Avatar({ handle, size = 72 }: { handle: string; size?: number }) {
+function Avatar({ handle, size = 72, imageUrl }: { handle: string; size?: number; imageUrl?: string }) {
   const initial = handle.replace("@", "")[0]?.toUpperCase() ?? "?";
   const palette = ["#7B5EA7", "#C0392B", "#2980B9", "#D35400", "#27AE60", "#8E44AD"];
   const idx = (handle.charCodeAt(1) ?? 0) % palette.length;
+
+  if (imageUrl) {
+    return (
+      <Image
+        source={{ uri: imageUrl }}
+        style={[styles.avatar, { width: size, height: size, borderRadius: size / 2 }]}
+      />
+    );
+  }
+
   return (
     <View
       style={[
@@ -104,7 +115,7 @@ export default function ProfileScreen({ navigation }: { navigation: any }) {
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
         {/* Profile header */}
         <View style={styles.profileHeader}>
-          <Avatar handle={user.handle} size={80} />
+          <Avatar handle={user.handle} size={80} imageUrl={user.avatarUrl} />
           <View style={styles.profileInfo}>
             <Text style={styles.displayName}>{user.displayName}</Text>
             <Text style={styles.handle}>{user.handle}</Text>

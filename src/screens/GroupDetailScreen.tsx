@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
   Pressable,
   SafeAreaView,
   ScrollView,
@@ -107,6 +108,7 @@ export default function GroupDetailScreen({
 }) {
   const groupId: string = route.params?.groupId;
   const groups = useAppStore((s) => s.groups);
+  const leaveGroup = useAppStore((s) => s.leaveGroup);
   const group = groups.find((g) => g.id === groupId) ?? null;
 
   const [members, setMembers] = useState<GroupMember[]>([]);
@@ -114,6 +116,7 @@ export default function GroupDetailScreen({
   const [isLoadingMembers, setIsLoadingMembers] = useState(true);
   const [isLoadingWagers, setIsLoadingWagers] = useState(true);
   const [copied, setCopied] = useState(false);
+  const [leaving, setLeaving] = useState(false);
 
   useEffect(() => {
     if (!groupId) return;
@@ -134,6 +137,30 @@ export default function GroupDetailScreen({
     });
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+  }
+
+  function handleLeaveGroup() {
+    Alert.alert(
+      "Leave Group",
+      `Are you sure you want to leave "${group?.name}"?`,
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Leave",
+          style: "destructive",
+          onPress: async () => {
+            setLeaving(true);
+            const result = await leaveGroup(groupId);
+            setLeaving(false);
+            if (result.ok) {
+              navigation.goBack();
+            } else {
+              Alert.alert("Error", result.message);
+            }
+          },
+        },
+      ]
+    );
   }
 
   if (!group) {
@@ -225,6 +252,19 @@ export default function GroupDetailScreen({
             ))}
           </View>
         )}
+
+        {/* Leave Group */}
+        <Pressable
+          style={[styles.leaveBtn, leaving && { opacity: 0.5 }]}
+          onPress={handleLeaveGroup}
+          disabled={leaving}
+        >
+          {leaving ? (
+            <ActivityIndicator size="small" color={theme.colors.destructive} />
+          ) : (
+            <Text style={styles.leaveBtnText}>Leave Group</Text>
+          )}
+        </Pressable>
       </ScrollView>
     </SafeAreaView>
   );
@@ -424,5 +464,15 @@ const styles = StyleSheet.create({
     fontSize: 9,
     fontWeight: "700",
     letterSpacing: 0.4,
+  },
+  leaveBtn: {
+    alignItems: "center",
+    paddingVertical: 16,
+    marginTop: 16,
+  },
+  leaveBtnText: {
+    color: theme.colors.destructive,
+    fontSize: 15,
+    fontWeight: "600",
   },
 });

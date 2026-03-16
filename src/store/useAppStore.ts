@@ -21,6 +21,7 @@ import {
   fetchMyGroups,
   createGroup as createGroupService,
   joinGroupByCode,
+  leaveGroup as leaveGroupService,
 } from "../services/groups";
 import {
   GamblingSettings,
@@ -80,7 +81,8 @@ type AppState = {
   setNotificationsEnabled: (next: boolean) => void;
   setChallengeAlertsEnabled: (next: boolean) => void;
   setSettlementAlertsEnabled: (next: boolean) => void;
-  updateUserProfile: (handle: string, displayName: string) => Promise<{ ok: boolean; message: string }>;
+  updateUserProfile: (handle: string, displayName: string, bio?: string, avatarUrl?: string) => Promise<{ ok: boolean; message: string }>;
+  updateAvatar: (avatarUrl: string) => Promise<void>;
   loadForYouFeed: () => Promise<void>;
   setDraftHandle: (handle: string) => void;
   setDraftPrivacy: (isPrivate: boolean) => void;
@@ -111,6 +113,7 @@ type AppState = {
   loadGroups: () => Promise<void>;
   createGroup: (name: string) => Promise<Group | null>;
   joinGroup: (code: string) => Promise<{ ok: boolean; message: string }>;
+  leaveGroup: (groupId: string) => Promise<{ ok: boolean; message: string }>;
   upsertGroup: (group: Group) => void;
 };
 
@@ -128,6 +131,8 @@ export const useAppStore = create<AppState>((set, get) => ({
     activeWagerCount: 1,
     followerCount: 24,
     followingCount: 18,
+    avatarUrl: undefined,
+    bio: undefined,
   },
   onboardingDraft: { handle: "", isPrivate: false, dob: "" },
   feed: feedPosts,
@@ -154,14 +159,28 @@ export const useAppStore = create<AppState>((set, get) => ({
   setChallengeAlertsEnabled: (next) => set({ challengeAlertsEnabled: next }),
   setSettlementAlertsEnabled: (next) => set({ settlementAlertsEnabled: next }),
 
-  updateUserProfile: async (handle, displayName) => {
+  updateUserProfile: async (handle, displayName, bio, avatarUrl) => {
     const state = get();
     const normalizedHandle = handle.startsWith("@") ? handle : `@${handle}`;
-    const result = await updateProfile(normalizedHandle, state.user.isPrivate, undefined, displayName);
+    const result = await updateProfile(normalizedHandle, state.user.isPrivate, undefined, displayName, bio, avatarUrl);
     if (result.ok) {
-      set((s) => ({ user: { ...s.user, handle: normalizedHandle, displayName } }));
+      set((s) => ({
+        user: {
+          ...s.user,
+          handle: normalizedHandle,
+          displayName,
+          ...(bio !== undefined ? { bio } : {}),
+          ...(avatarUrl !== undefined ? { avatarUrl } : {}),
+        },
+      }));
     }
     return result;
+  },
+
+  updateAvatar: async (avatarUrl) => {
+    const state = get();
+    set((s) => ({ user: { ...s.user, avatarUrl } }));
+    await updateProfile(state.user.handle, state.user.isPrivate, undefined, state.user.displayName, state.user.bio, avatarUrl);
   },
 
   loadForYouFeed: async () => {
@@ -331,6 +350,8 @@ export const useAppStore = create<AppState>((set, get) => ({
             totalWagered: profile.totalWagered,
             followerCount: profile.followerCount,
             followingCount: profile.followingCount,
+            bio: profile.bio,
+            avatarUrl: profile.avatarUrl,
             activeWagerCount: data.wagers.filter(
               (w) => w.status === "ACTIVE" || w.status === "PENDING"
             ).length,
@@ -575,6 +596,14 @@ export const useAppStore = create<AppState>((set, get) => ({
       });
     }
     return { ok: result.ok, message: result.message };
+  },
+
+  leaveGroup: async (groupId) => {
+    const result = await leaveGroupService(groupId);
+    if (result.ok) {
+      set((s) => ({ groups: s.groups.filter((g) => g.id !== groupId) }));
+    }
+    return result;
   },
 
   upsertGroup: (group) =>
