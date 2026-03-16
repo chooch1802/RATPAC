@@ -39,14 +39,16 @@ function UserRow({
   isFollowing,
   isSelf,
   onToggleFollow,
+  onPress,
 }: {
   user: SuggestedUser;
   isFollowing: boolean;
   isSelf: boolean;
   onToggleFollow: () => void;
+  onPress?: () => void;
 }) {
   return (
-    <View style={styles.userRow}>
+    <Pressable style={styles.userRow} onPress={onPress}>
       <Avatar handle={user.handle} />
       <View style={styles.userInfo}>
         <Text style={styles.userDisplayName}>{user.displayName}</Text>
@@ -61,14 +63,14 @@ function UserRow({
       {!isSelf && (
         <Pressable
           style={[styles.followBtn, isFollowing && styles.followingBtn]}
-          onPress={onToggleFollow}
+          onPress={(e) => { e.stopPropagation?.(); onToggleFollow(); }}
         >
           <Text style={[styles.followBtnText, isFollowing && styles.followingBtnText]}>
             {isFollowing ? "Following" : "Follow"}
           </Text>
         </Pressable>
       )}
-    </View>
+    </Pressable>
   );
 }
 
@@ -159,8 +161,11 @@ export default function SearchScreen({ navigation }: { navigation: any }) {
             user={item}
             isFollowing={followingHandles.includes(item.handle)}
             isSelf={item.handle === user.handle}
-            onToggleFollow={() => {
-              void toggleFollowForHandle(item.handle);
+            onToggleFollow={() => { void toggleFollowForHandle(item.handle); }}
+            onPress={() => {
+              if (item.handle !== user.handle) {
+                navigation.navigate("UserProfile", { handle: item.handle });
+              }
             }}
           />
         )}
