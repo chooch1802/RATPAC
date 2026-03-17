@@ -66,6 +66,7 @@ type AppState = {
   notifications: Notification[];
   followingHandles: string[];
   showPaywall: boolean;
+  paywallTrigger: string | null;
   showCreateWager: boolean;
   isLoading: boolean;
   isSubscriptionSyncing: boolean;
@@ -90,7 +91,7 @@ type AppState = {
   setDraftDob: (dob: string) => void;
   completeOnboarding: () => Promise<void>;
   setSubscribed: (next: boolean) => void;
-  setPaywallVisible: (next: boolean) => void;
+  setPaywallVisible: (next: boolean, trigger?: string) => void;
   setCreateWagerVisible: (next: boolean) => void;
   setCreateWagerContext: (ctx: { parentWagerId?: string; groupId?: string } | null) => void;
   createWager: (payload: CreateWagerPayload) => Promise<void>;
@@ -143,6 +144,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   notifications: mockNotifications,
   followingHandles: [],
   showPaywall: false,
+  paywallTrigger: null,
   showCreateWager: false,
   isLoading: false,
   isSubscriptionSyncing: false,
@@ -214,14 +216,14 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   setSubscribed: (next) => set((s) => ({ user: { ...s.user, isSubscribed: next } })),
-  setPaywallVisible: (next) => set({ showPaywall: next }),
+  setPaywallVisible: (next, trigger?) => set({ showPaywall: next, paywallTrigger: next ? (trigger ?? null) : null }),
   setCreateWagerVisible: (next) => set({ showCreateWager: next }),
   setCreateWagerContext: (ctx) => set({ createWagerContext: ctx }),
 
   createWager: async ({ activity, amount, opponentHandle, termsText, isPublic, paymentMethod, paymentHandle, sport, betType, groupId, parentWagerId }) => {
     const state = get();
-    if (!state.user.isSubscribed) {
-      set({ showPaywall: true });
+    if (!state.user.isSubscribed && state.user.activeWagerCount >= 3) {
+      set({ showPaywall: true, paywallTrigger: "wager_limit" });
       return;
     }
 
@@ -577,6 +579,11 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   createGroup: async (name) => {
+    const state = get();
+    if (!state.user.isSubscribed) {
+      set({ showPaywall: true, paywallTrigger: "group_create" });
+      return null;
+    }
     const group = await createGroupService(name);
     if (group) {
       set((s) => ({ groups: [group, ...s.groups] }));
