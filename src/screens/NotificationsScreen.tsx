@@ -38,6 +38,7 @@ const TYPE_ICONS: Record<NotificationType, IoniconName> = {
   FOLLOW_REQUEST: "person-outline",
   COMMENT: "chatbubble-outline",
   TEAM_INVITE: "people-outline",
+  PAYMENT_NUDGE: "cash-outline",
 };
 
 function NotifRow({

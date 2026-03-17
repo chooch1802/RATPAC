@@ -3,6 +3,7 @@ import {
   ActionSheetIOS,
   ActivityIndicator,
   Alert,
+  Clipboard,
   KeyboardAvoidingView,
   Linking,
   Platform,
@@ -40,28 +41,70 @@ function timeAgo(dateStr: string): string {
   return `${Math.floor(hours / 24)}d ago`;
 }
 
-const PAYMENT_CONFIG: Record<
-  PaymentMethod,
-  { icon: string; url: (amount: number, handle?: string) => string }
-> = {
+type PaymentConfigEntry = {
+  icon: string;
+  deepLink: boolean;
+  url?: (amount: number, handle?: string) => string;
+  label?: string;
+  copyLabel?: string;
+};
+
+const PAYMENT_CONFIG: Record<PaymentMethod, PaymentConfigEntry> = {
   Venmo: {
     icon: "💙",
+    deepLink: true,
     url: (a, h) =>
       h
-        ? `venmo://paycharge?txn=pay&recipients=${h.replace("@", "")}&amount=${a}&note=Ratpac+Wager`
+        ? `venmo://paycharge?txn=pay&recipients=${encodeURIComponent(h.replace("@", ""))}&amount=${a}&note=Ratpac+Wager`
         : `venmo://paycharge?txn=pay&amount=${a}&note=Ratpac+Wager`,
   },
   "Cash App": {
     icon: "💚",
+    deepLink: true,
     url: (a, h) =>
-      h ? `https://cash.app/${h.startsWith("$") ? h : `$${h}`}/${a}` : `cashapp://`,
+      h ? `https://cash.app/${h.startsWith("$") ? h : `$${h}`}/${a}` : `https://cash.app/`,
   },
   PayPal: {
     icon: "🔵",
+    deepLink: true,
     url: (a, h) =>
-      h ? `https://paypal.me/${h.replace("paypal.me/", "")}/${a}` : `paypal://`,
+      h ? `https://paypal.me/${h.replace(/^paypal\.me\//, "")}/${a}` : `paypal://`,
   },
-  Other: { icon: "💸", url: () => `` },
+  Revolut: {
+    icon: "🌀",
+    deepLink: true,
+    url: (a, h) =>
+      h ? `https://revolut.me/${h.replace("@", "")}/${a}` : `https://revolut.com/`,
+  },
+  Zelle: {
+    icon: "💛",
+    deepLink: false,
+    copyLabel: "Copy Zelle handle",
+    label: "Open banking app and send via Zelle",
+  },
+  PayID: {
+    icon: "🇦🇺",
+    deepLink: false,
+    copyLabel: "Copy PayID",
+    label: "Open your banking app and pay via PayID",
+  },
+  Interac: {
+    icon: "🇨🇦",
+    deepLink: false,
+    copyLabel: "Copy Interac email/phone",
+    label: "Open your banking app and send via Interac e-Transfer",
+  },
+  "Bank Transfer": {
+    icon: "🏦",
+    deepLink: false,
+    copyLabel: "Copy account details",
+    label: "Transfer directly from your banking app",
+  },
+  Other: {
+    icon: "💸",
+    deepLink: false,
+    label: "Arrange payment directly with your opponent",
+  },
 };
 
 const STATUS_CONFIG: Record<WagerStatus, { label: string; color: string; desc: string }> = {
@@ -120,6 +163,7 @@ export default function WagerDetailScreen({
   const disputeResult = useAppStore((s) => s.disputeResult);
   const setCreateWagerVisible = useAppStore((s) => s.setCreateWagerVisible);
   const setCreateWagerContext = useAppStore((s) => s.setCreateWagerContext);
+  const markAsPaid = useAppStore((s) => s.markAsPaid);
 
   function handleReport() {
     const report = () =>
@@ -145,6 +189,7 @@ export default function WagerDetailScreen({
   const [resultActionLoading, setResultActionLoading] = useState<
     "" | "won" | "lost" | "confirm" | "dispute"
   >("");
+  const [markingPaid, setMarkingPaid] = useState(false);
   const [isFetching, setIsFetching] = useState(false);
   const [sideBets, setSideBets] = useState<Wager[]>([]);
   const [sideBetsLoading, setSideBetsLoading] = useState(false);
@@ -507,37 +552,86 @@ export default function WagerDetailScreen({
         )}
 
         {/* Pay up section */}
-        {(wager.status === "SETTLED" || wager.status === "AWAITING_RESULT") && wager.paymentMethod && (
-          <View style={styles.payCard}>
-            <Text style={styles.actionsTitle}>Settle Up</Text>
-            <Text style={styles.paySubtitle}>
-              {wager.paymentHandle
-                ? `Send $${wager.amount.toFixed(2)} to ${wager.paymentHandle} via ${wager.paymentMethod}`
-                : `Send $${wager.amount.toFixed(2)} to the winner via ${wager.paymentMethod}`}
-            </Text>
-            {wager.paymentMethod !== "Other" ? (
+        {wager.status === "SETTLED" && wager.paymentMethod && (() => {
+          const cfg = PAYMENT_CONFIG[wager.paymentMethod as PaymentMethod];
+          const amountStr = `$${wager.amount.toFixed(2)}`;
+          const loserHandle = wager.winnerHandle === user.handle ? wager.opponentHandle : user.handle;
+          const iAmLoser = loserHandle === user.handle;
+
+          if (wager.isPaid) {
+            return (
+              <View style={[styles.payCard, styles.payCardConfirmed]}>
+                <Text style={styles.payConfirmedText}>Payment confirmed</Text>
+                <Text style={styles.payHint}>
+                  {amountStr} marked as paid · {wager.paidAt ? new Date(wager.paidAt).toLocaleDateString() : ""}
+                </Text>
+              </View>
+            );
+          }
+
+          return (
+            <View style={styles.payCard}>
+              <Text style={styles.actionsTitle}>Settle Up</Text>
+              <Text style={styles.paySubtitle}>
+                {iAmLoser
+                  ? wager.paymentHandle
+                    ? `You owe ${amountStr} — send to ${wager.paymentHandle} via ${wager.paymentMethod}`
+                    : `You owe ${amountStr} via ${wager.paymentMethod}`
+                  : wager.paymentHandle
+                    ? `${wager.opponentHandle} owes ${amountStr} to ${wager.paymentHandle} via ${wager.paymentMethod}`
+                    : `${wager.opponentHandle} owes ${amountStr} via ${wager.paymentMethod}`}
+              </Text>
+
+              {cfg.deepLink && cfg.url ? (
+                <Pressable
+                  style={styles.payBtn}
+                  onPress={() => {
+                    const url = cfg.url!(wager.amount, wager.paymentHandle);
+                    if (url) Linking.openURL(url);
+                  }}
+                >
+                  <Text style={styles.payBtnText}>
+                    {cfg.icon}{" "}
+                    {wager.paymentHandle
+                      ? `Pay ${wager.paymentHandle} ${amountStr}`
+                      : `Open ${wager.paymentMethod}`}
+                  </Text>
+                </Pressable>
+              ) : (
+                <>
+                  {wager.paymentHandle ? (
+                    <Pressable
+                      style={styles.copyBtn}
+                      onPress={() => {
+                        Clipboard.setString(wager.paymentHandle!);
+                        Alert.alert("Copied", `${wager.paymentMethod} handle copied to clipboard.`);
+                      }}
+                    >
+                      <Text style={styles.copyBtnText}>
+                        {cfg.icon} {cfg.copyLabel ?? "Copy handle"}: {wager.paymentHandle}
+                      </Text>
+                    </Pressable>
+                  ) : null}
+                  <Text style={styles.payHint}>{cfg.label}</Text>
+                </>
+              )}
+
               <Pressable
-                style={styles.payBtn}
-                onPress={() => {
-                  const cfg = PAYMENT_CONFIG[wager.paymentMethod as PaymentMethod];
-                  const url = cfg.url(wager.amount, wager.paymentHandle);
-                  if (url) Linking.openURL(url);
+                style={[styles.markPaidBtn, markingPaid && styles.actionBtnDisabled]}
+                disabled={markingPaid}
+                onPress={async () => {
+                  setMarkingPaid(true);
+                  await markAsPaid(wager.id);
+                  setMarkingPaid(false);
                 }}
               >
-                <Text style={styles.payBtnText}>
-                  {PAYMENT_CONFIG[wager.paymentMethod as PaymentMethod].icon}{" "}
-                  {wager.paymentHandle
-                    ? `Pay ${wager.paymentHandle} $${wager.amount.toFixed(2)}`
-                    : `Open ${wager.paymentMethod}`}
+                <Text style={styles.markPaidBtnText}>
+                  {markingPaid ? "Confirming…" : iAmLoser ? "I've Paid" : "Mark as Received"}
                 </Text>
               </Pressable>
-            ) : (
-              <Text style={styles.payHint}>
-                Arrange payment directly with your opponent.
-              </Text>
-            )}
-          </View>
-        )}
+            </View>
+          );
+        })()}
 
         {/* Side Bets */}
         {(wager.status === "ACTIVE" ||
@@ -959,6 +1053,43 @@ const styles = StyleSheet.create({
     color: theme.colors.textMuted,
     fontSize: 13,
     lineHeight: 18,
+  },
+  payCardConfirmed: {
+    borderColor: `${theme.colors.win}50`,
+    backgroundColor: `${theme.colors.win}10`,
+    alignItems: "center",
+  },
+  payConfirmedText: {
+    color: theme.colors.win,
+    fontWeight: "700",
+    fontSize: 15,
+  },
+  copyBtn: {
+    backgroundColor: theme.colors.bgTertiary,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    borderRadius: 12,
+    paddingVertical: 13,
+    paddingHorizontal: 16,
+    alignItems: "center",
+  },
+  copyBtnText: {
+    color: theme.colors.textPrimary,
+    fontWeight: "600",
+    fontSize: 14,
+  },
+  markPaidBtn: {
+    backgroundColor: theme.colors.bgTertiary,
+    borderWidth: 1,
+    borderColor: theme.colors.accent,
+    borderRadius: 12,
+    paddingVertical: 13,
+    alignItems: "center",
+  },
+  markPaidBtnText: {
+    color: theme.colors.accent,
+    fontWeight: "700",
+    fontSize: 15,
   },
   sideBetsCard: {
     backgroundColor: theme.colors.bgSecondary,

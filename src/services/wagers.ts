@@ -33,6 +33,8 @@ function rowToWager(row: any): Wager {
     betType: row.bet_type ?? undefined,
     groupId: row.group_id ?? undefined,
     parentWagerId: row.parent_wager_id ?? undefined,
+    isPaid: row.is_paid ?? false,
+    paidAt: row.paid_at ?? undefined,
     createdAt: row.created_at ?? new Date().toISOString(),
   };
 }
@@ -41,6 +43,7 @@ const WAGER_SELECT = `
   id, activity, amount, status, created_at,
   opponent_handle, terms_text, winner_handle, declarer_handle,
   payment_method, payment_handle, sport, bet_type, group_id, parent_wager_id,
+  is_paid, paid_at,
   opponent:profiles!wagers_opponent_id_fkey(display_name, handle)
 `;
 
@@ -697,6 +700,22 @@ export async function addComment(
 
   if (error) return { ok: false, message: error.message };
   return { ok: true, message: "Comment posted." };
+}
+
+export async function markWagerPaid(wagerId: string): Promise<{ ok: boolean }> {
+  if (!supabase) return { ok: false };
+  const client = supabase;
+
+  const { data: { user } } = await client.auth.getUser();
+  if (!user) return { ok: false };
+
+  const { error } = await client
+    .from("wagers")
+    .update({ is_paid: true, paid_at: new Date().toISOString() })
+    .eq("id", wagerId)
+    .eq("status", "SETTLED");
+
+  return { ok: !error };
 }
 
 export async function subscribeToWagerChanges(

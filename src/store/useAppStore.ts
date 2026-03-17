@@ -13,6 +13,7 @@ import {
   loadPublicFeed,
   markAllNotificationsAsRead,
   markNotificationAsRead,
+  markWagerPaid,
   reactToFeedPost,
   respondToChallenge,
   settleWager,
@@ -115,6 +116,7 @@ type AppState = {
   joinGroup: (code: string) => Promise<{ ok: boolean; message: string }>;
   leaveGroup: (groupId: string) => Promise<{ ok: boolean; message: string }>;
   upsertGroup: (group: Group) => void;
+  markAsPaid: (wagerId: string) => Promise<void>;
 };
 
 export const useAppStore = create<AppState>((set, get) => ({
@@ -604,6 +606,15 @@ export const useAppStore = create<AppState>((set, get) => ({
       set((s) => ({ groups: s.groups.filter((g) => g.id !== groupId) }));
     }
     return result;
+  },
+
+  markAsPaid: async (wagerId) => {
+    set((s) => ({
+      wagers: s.wagers.map((w) =>
+        w.id === wagerId ? { ...w, isPaid: true, paidAt: new Date().toISOString() } : w
+      ),
+    }));
+    await markWagerPaid(wagerId);
   },
 
   upsertGroup: (group) =>

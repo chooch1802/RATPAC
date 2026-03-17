@@ -13,12 +13,31 @@ import { useAppStore } from "../store/useAppStore";
 import { theme } from "../theme";
 import { Group, PaymentMethod } from "../types";
 
-const PAYMENT_METHODS: { id: PaymentMethod; icon: string }[] = [
-  { id: "Venmo", icon: "💙" },
-  { id: "Cash App", icon: "💚" },
-  { id: "PayPal", icon: "🔵" },
-  { id: "Other", icon: "💸" },
+const PAYMENT_METHODS: { id: PaymentMethod; icon: string; hint: string }[] = [
+  { id: "Venmo", icon: "💙", hint: "🇺🇸" },
+  { id: "Cash App", icon: "💚", hint: "🇺🇸🇬🇧" },
+  { id: "PayPal", icon: "🔵", hint: "🌍" },
+  { id: "Zelle", icon: "💛", hint: "🇺🇸" },
+  { id: "Revolut", icon: "🌀", hint: "🇬🇧🇦🇺" },
+  { id: "PayID", icon: "🇦🇺", hint: "🇦🇺🇳🇿" },
+  { id: "Interac", icon: "🇨🇦", hint: "🇨🇦" },
+  { id: "Bank Transfer", icon: "🏦", hint: "🌍" },
+  { id: "Other", icon: "💸", hint: "" },
 ];
+
+function getPaymentHandlePlaceholder(method: PaymentMethod): string {
+  switch (method) {
+    case "Venmo": return "@yourhandle";
+    case "Cash App": return "$yourcashtag";
+    case "PayPal": return "paypal.me/username";
+    case "Zelle": return "Phone or email";
+    case "Revolut": return "@revtag or phone";
+    case "PayID": return "Email, phone, or ABN";
+    case "Interac": return "Email or phone number";
+    case "Bank Transfer": return "BSB/Account or IBAN";
+    default: return "Your handle or details";
+  }
+}
 
 type Sport = {
   id: string;
@@ -508,9 +527,13 @@ export function CreateWagerModal() {
                           styles.paymentChipText,
                           paymentMethod === m.id && styles.paymentChipTextSelected,
                         ]}
+                        numberOfLines={1}
                       >
                         {m.id}
                       </Text>
+                      {m.hint ? (
+                        <Text style={styles.paymentChipHint}>{m.hint}</Text>
+                      ) : null}
                     </Pressable>
                   ))}
                 </View>
@@ -518,13 +541,7 @@ export function CreateWagerModal() {
                   <TextInput
                     value={paymentHandle}
                     onChangeText={setPaymentHandle}
-                    placeholder={
-                      paymentMethod === "Venmo"
-                        ? "@yourhandle"
-                        : paymentMethod === "Cash App"
-                        ? "$yourcashtag"
-                        : "paypal.me/username"
-                    }
+                    placeholder={getPaymentHandlePlaceholder(paymentMethod)}
                     placeholderTextColor={theme.colors.textMuted}
                     style={styles.input}
                     autoCapitalize="none"
@@ -901,18 +918,21 @@ const styles = StyleSheet.create({
   },
   paymentGrid: {
     flexDirection: "row",
+    flexWrap: "wrap",
     gap: 8,
     marginBottom: 14,
   },
   paymentChip: {
-    flex: 1,
+    width: "30%",
+    flexGrow: 1,
     backgroundColor: theme.colors.bgTertiary,
     borderWidth: 1,
     borderColor: theme.colors.border,
     borderRadius: 12,
     paddingVertical: 12,
+    paddingHorizontal: 4,
     alignItems: "center",
-    gap: 4,
+    gap: 3,
   },
   paymentChipSelected: {
     borderColor: theme.colors.accent,
@@ -923,11 +943,16 @@ const styles = StyleSheet.create({
   },
   paymentChipText: {
     color: theme.colors.textSecondary,
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: "600",
+    textAlign: "center",
   },
   paymentChipTextSelected: {
     color: theme.colors.accent,
+  },
+  paymentChipHint: {
+    fontSize: 9,
+    color: theme.colors.textMuted,
   },
   paymentHint: {
     color: theme.colors.textMuted,

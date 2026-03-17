@@ -34,7 +34,16 @@ export type FeedPost = {
   createdAt: string;
 };
 
-export type PaymentMethod = "Venmo" | "Cash App" | "PayPal" | "Other";
+export type PaymentMethod =
+  | "Venmo"       // 🇺🇸 US
+  | "Cash App"    // 🇺🇸 US / 🇬🇧 UK
+  | "PayPal"      // 🌍 Global
+  | "Zelle"       // 🇺🇸 US
+  | "Revolut"     // 🇬🇧 UK / 🇦🇺 AU / 🌍 Global
+  | "PayID"       // 🇦🇺 AU / 🇳🇿 NZ
+  | "Interac"     // 🇨🇦 CA
+  | "Bank Transfer" // 🌍 Global fallback
+  | "Other";
 
 export type Wager = {
   id: string;
@@ -53,6 +62,8 @@ export type Wager = {
   betType?: string;
   groupId?: string;
   parentWagerId?: string;
+  isPaid?: boolean;
+  paidAt?: string;
 };
 
 export type Group = {
@@ -110,7 +121,8 @@ export type NotificationType =
   | "NEW_FOLLOWER"
   | "FOLLOW_REQUEST"
   | "COMMENT"
-  | "TEAM_INVITE";
+  | "TEAM_INVITE"
+  | "PAYMENT_NUDGE";
 
 export type Notification = {
   id: string;
