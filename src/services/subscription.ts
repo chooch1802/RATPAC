@@ -38,6 +38,27 @@ export async function getOfferings(): Promise<PurchasesPackage | null> {
   }
 }
 
+/**
+ * Fetch the win-back promotional offering.
+ * In RevenueCat dashboard: create an offering called "win_back" with a
+ * weekly package pointing to your $0.99/week App Store promotional offer.
+ * In App Store Connect: Subscription > Add Promotional Offer > Pay as you go
+ * $0.99/week for 4 pay periods, ref name "win_back_099".
+ */
+export async function getWinBackOffering(): Promise<PurchasesPackage | null> {
+  if (!API_KEY_IOS) return null;
+  try {
+    const offerings = await Purchases.getOfferings();
+    return (
+      offerings.all["win_back"]?.weekly ??
+      offerings.all["win_back"]?.monthly ??
+      null
+    );
+  } catch {
+    return null;
+  }
+}
+
 export async function purchasePackage(pkg: PurchasesPackage): Promise<{
   ok: boolean;
   message: string;

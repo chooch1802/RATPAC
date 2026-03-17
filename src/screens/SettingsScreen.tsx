@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import {
   Alert,
   Linking,
@@ -10,6 +10,7 @@ import {
   Text,
   View,
 } from "react-native";
+import { CancellationFlowModal } from "../components/CancellationFlowModal";
 import { registerAndSaveToken, removeDeviceToken, registerForPushNotifications } from "../services/pushNotifications";
 import { useAppStore } from "../store/useAppStore";
 import { theme } from "../theme";
@@ -56,6 +57,7 @@ export default function SettingsScreen({ navigation }: { navigation: any }) {
   const user = useAppStore((s) => s.user);
   const setDraftPrivacy = useAppStore((s) => s.setDraftPrivacy);
   const setAuth = useAppStore((s) => s.setAuth);
+  const [showCancellationFlow, setShowCancellationFlow] = useState(false);
   const notificationsEnabled = useAppStore((s) => s.notificationsEnabled);
   const challengeAlertsEnabled = useAppStore((s) => s.challengeAlertsEnabled);
   const settlementAlertsEnabled = useAppStore((s) => s.settlementAlertsEnabled);
@@ -126,7 +128,7 @@ export default function SettingsScreen({ navigation }: { navigation: any }) {
           {user.isSubscribed ? (
             <SettingsRow
               label="Manage subscription"
-              onPress={() => Linking.openURL("https://apps.apple.com/account/subscriptions")}
+              onPress={() => setShowCancellationFlow(true)}
             />
           ) : (
             <SettingsRow
@@ -208,6 +210,11 @@ export default function SettingsScreen({ navigation }: { navigation: any }) {
 
         <Text style={styles.version}>Ratpac v1.0</Text>
       </ScrollView>
+
+      <CancellationFlowModal
+        visible={showCancellationFlow}
+        onClose={() => setShowCancellationFlow(false)}
+      />
     </SafeAreaView>
   );
 }

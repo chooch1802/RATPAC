@@ -184,6 +184,16 @@ export async function syncProfileForCurrentUser(): Promise<void> {
   await ensureProfileFromSession();
 }
 
+export async function logCancellationSurvey(reason: string): Promise<void> {
+  if (!supabase) return;
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return;
+  await supabase.from("cancellation_surveys").insert({
+    user_id: user.id,
+    reason,
+  });
+}
+
 export async function signInWithOAuth(provider: OAuthProvider): Promise<AuthResult> {
   if (!supabase) {
     return {
