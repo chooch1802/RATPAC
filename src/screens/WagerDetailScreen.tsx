@@ -16,7 +16,7 @@ import {
   View,
 } from "react-native";
 import { fetchSideBets, fetchWagerById, fetchComments, addComment } from "../services/wagers";
-import { useAppStore } from "../store/useAppStore";
+import { isProUser, useAppStore } from "../store/useAppStore";
 import { theme } from "../theme";
 import { PaymentMethod, Wager, WagerComment, WagerStatus } from "../types";
 
@@ -645,7 +645,7 @@ export default function WagerDetailScreen({
               <Pressable
                 style={styles.sideBetAddBtn}
                 onPress={() => {
-                  if (!user.isSubscribed) {
+                  if (!isProUser(user)) {
                     setPaywallVisible(true, "side_bet");
                     return;
                   }

@@ -106,6 +106,7 @@ export type UserProfile = {
   followingCount: number;
   avatarUrl?: string;
   bio?: string;
+  trialEndsAt?: string;
 };
 
 export type NotificationType =

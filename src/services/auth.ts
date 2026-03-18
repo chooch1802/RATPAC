@@ -31,6 +31,7 @@ async function ensureProfileFromSession(): Promise<void> {
     user.user_metadata?.name ??
     handle;
 
+  const trialEndsAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
   await supabase.from("profiles").upsert(
     {
       id: user.id,
@@ -38,6 +39,7 @@ async function ensureProfileFromSession(): Promise<void> {
       display_name: displayName,
       is_private: false,
       is_subscribed: false,
+      trial_ends_at: trialEndsAt,
     },
     { onConflict: "id", ignoreDuplicates: true }
   );
@@ -55,6 +57,7 @@ export async function loadProfile(): Promise<{
   followingCount: number;
   bio?: string;
   avatarUrl?: string;
+  trialEndsAt?: string;
 } | null> {
   if (!supabase) return null;
   const { data: { user } } = await supabase.auth.getUser();
@@ -62,7 +65,7 @@ export async function loadProfile(): Promise<{
 
   const { data, error } = await supabase
     .from("profiles")
-    .select("handle, display_name, is_private, is_subscribed, wins, losses, total_wagered, follower_count, following_count, bio, avatar_url")
+    .select("handle, display_name, is_private, is_subscribed, wins, losses, total_wagered, follower_count, following_count, bio, avatar_url, trial_ends_at")
     .eq("id", user.id)
     .single();
 
@@ -80,6 +83,7 @@ export async function loadProfile(): Promise<{
     followingCount: data.following_count,
     bio: data.bio ?? undefined,
     avatarUrl: data.avatar_url ?? undefined,
+    trialEndsAt: data.trial_ends_at ?? undefined,
   };
 }
 

@@ -35,6 +35,13 @@ import {
 } from "../services/gambling";
 import { Activity, FeedPost, Group, Notification, PaymentMethod, Reactions, UserProfile, Wager } from "../types";
 
+/** True if the user has an active paid subscription OR an unexpired 7-day Pro trial */
+export function isProUser(user: UserProfile): boolean {
+  if (user.isSubscribed) return true;
+  if (!user.trialEndsAt) return false;
+  return new Date(user.trialEndsAt) > new Date();
+}
+
 type OnboardingDraft = {
   handle: string;
   isPrivate: boolean;
@@ -136,6 +143,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     followingCount: 18,
     avatarUrl: undefined,
     bio: undefined,
+    trialEndsAt: undefined,
   },
   onboardingDraft: { handle: "", isPrivate: false, dob: "" },
   feed: feedPosts,
@@ -222,7 +230,7 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   createWager: async ({ activity, amount, opponentHandle, termsText, isPublic, paymentMethod, paymentHandle, sport, betType, groupId, parentWagerId }) => {
     const state = get();
-    if (!state.user.isSubscribed && state.user.activeWagerCount >= 3) {
+    if (!isProUser(state.user) && state.user.activeWagerCount >= 3) {
       set({ showPaywall: true, paywallTrigger: "wager_limit" });
       return;
     }
@@ -356,6 +364,7 @@ export const useAppStore = create<AppState>((set, get) => ({
             followingCount: profile.followingCount,
             bio: profile.bio,
             avatarUrl: profile.avatarUrl,
+            trialEndsAt: profile.trialEndsAt,
             activeWagerCount: data.wagers.filter(
               (w) => w.status === "ACTIVE" || w.status === "PENDING"
             ).length,
@@ -580,7 +589,7 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   createGroup: async (name) => {
     const state = get();
-    if (!state.user.isSubscribed) {
+    if (!isProUser(state.user)) {
       set({ showPaywall: true, paywallTrigger: "group_create" });
       return null;
     }

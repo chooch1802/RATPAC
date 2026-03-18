@@ -12,7 +12,7 @@ import {
   View,
 } from "react-native";
 import { restorePurchases } from "../services/subscription";
-import { useAppStore } from "../store/useAppStore";
+import { isProUser, useAppStore } from "../store/useAppStore";
 import { theme } from "../theme";
 import { Wager } from "../types";
 
@@ -96,8 +96,12 @@ export default function ProfileScreen({ navigation }: { navigation: any }) {
     }
   }
 
-  const settledWagers = wagers.filter((w) => w.status === "SETTLED");
   const totalWagered = wagers.reduce((acc, w) => acc + w.amount, 0);
+  const proActive = isProUser(user);
+  const onTrial = !user.isSubscribed && proActive && !!user.trialEndsAt;
+  const trialDaysLeft = onTrial
+    ? Math.max(0, Math.ceil((new Date(user.trialEndsAt!).getTime() - Date.now()) / 86400000))
+    : 0;
 
   return (
     <SafeAreaView style={styles.container}>
@@ -125,9 +129,9 @@ export default function ProfileScreen({ navigation }: { navigation: any }) {
                   {user.isPrivate ? "Private" : "Public"}
                 </Text>
               </View>
-              {user.isSubscribed && (
+              {proActive && (
                 <View style={styles.badgePro}>
-                  <Text style={styles.badgeProText}>Pro</Text>
+                  <Text style={styles.badgeProText}>{onTrial ? `Trial · ${trialDaysLeft}d` : "Pro"}</Text>
                 </View>
               )}
             </View>
@@ -164,31 +168,54 @@ export default function ProfileScreen({ navigation }: { navigation: any }) {
           />
         </View>
 
-        {/* Subscription */}
-        <View style={styles.subCard}>
+        {/* Subscription / Trial card */}
+        <View style={[styles.subCard, onTrial && styles.subCardTrial]}>
           <View style={styles.subCardRow}>
-            <View>
+            <View style={{ flex: 1 }}>
               <Text style={styles.subCardTitle}>
-                {user.isSubscribed ? "Ratpac Pro" : "Free tier"}
+                {user.isSubscribed
+                  ? "Ratpac Pro"
+                  : onTrial
+                  ? `Pro Trial — ${trialDaysLeft} day${trialDaysLeft !== 1 ? "s" : ""} left`
+                  : "Free tier"}
               </Text>
               <Text style={styles.subCardDesc}>
                 {user.isSubscribed
-                  ? "Full access — $4.99/month"
-                  : "Upgrade to create and accept wagers"}
+                  ? "Full access · $1.99/week"
+                  : onTrial
+                  ? "Full access while your trial is active"
+                  : "Upgrade for unlimited wagers, groups & side bets"}
               </Text>
             </View>
-            <View style={[styles.subStatusDot, user.isSubscribed && styles.subStatusDotActive]} />
+            <View style={[styles.subStatusDot, proActive && styles.subStatusDotActive]} />
           </View>
+
+          {onTrial && (
+            <View style={styles.trialProgressBg}>
+              <View
+                style={[
+                  styles.trialProgressFill,
+                  { width: `${((7 - trialDaysLeft) / 7) * 100}%` },
+                ]}
+              />
+            </View>
+          )}
+
           <View style={styles.subCardButtons}>
-            <Pressable
-              style={[styles.subActionBtn, user.isSubscribed && styles.subActionBtnSecondary]}
-              onPress={onSubscriptionAction}
-            >
-              <Text style={[styles.subActionBtnText, user.isSubscribed && styles.subActionBtnTextSecondary]}>
-                {user.isSubscribed ? "Manage subscription" : "Subscribe — $4.99/mo"}
-              </Text>
-            </Pressable>
-            {!user.isSubscribed && (
+            {user.isSubscribed ? (
+              <Pressable style={styles.subActionBtnSecondary} onPress={onSubscriptionAction}>
+                <Text style={styles.subActionBtnTextSecondary}>Manage subscription</Text>
+              </Pressable>
+            ) : onTrial ? (
+              <Pressable style={styles.subActionBtn} onPress={() => setPaywallVisible(true)}>
+                <Text style={styles.subActionBtnText}>Subscribe to keep Pro — $1.99/week</Text>
+              </Pressable>
+            ) : (
+              <Pressable style={styles.subActionBtn} onPress={() => setPaywallVisible(true)}>
+                <Text style={styles.subActionBtnText}>Upgrade to Pro — $1.99/week</Text>
+              </Pressable>
+            )}
+            {!proActive && (
               <Pressable
                 style={[styles.subRefreshBtn, isSubscriptionSyncing && { opacity: 0.5 }]}
                 onPress={async () => setStatusMsg(await refreshSubscriptionStatus())}
@@ -386,6 +413,22 @@ const styles = StyleSheet.create({
     padding: 16,
     marginBottom: 24,
   },
+  subCardTrial: {
+    borderColor: `${theme.colors.accent}60`,
+    backgroundColor: `${theme.colors.accent}08`,
+  },
+  trialProgressBg: {
+    height: 4,
+    backgroundColor: theme.colors.bgTertiary,
+    borderRadius: 2,
+    marginBottom: 14,
+    overflow: "hidden",
+  },
+  trialProgressFill: {
+    height: 4,
+    backgroundColor: theme.colors.accent,
+    borderRadius: 2,
+  },
   subCardRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -424,6 +467,9 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.bgTertiary,
     borderWidth: 1,
     borderColor: theme.colors.border,
+    borderRadius: 10,
+    paddingVertical: 11,
+    alignItems: "center",
   },
   subActionBtnText: {
     color: "#001B10",
@@ -432,6 +478,8 @@ const styles = StyleSheet.create({
   },
   subActionBtnTextSecondary: {
     color: theme.colors.textPrimary,
+    fontWeight: "700",
+    fontSize: 14,
   },
   subRefreshBtn: {
     alignItems: "center",
