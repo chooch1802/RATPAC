@@ -17,6 +17,24 @@ import { redeemReferralCode } from "../services/auth";
 import { useAppStore } from "../store/useAppStore";
 import { theme } from "../theme";
 
+const INTRO_SLIDES = [
+  {
+    icon: "⚡",
+    title: "Challenge Anyone",
+    body: "Create a wager with friends for your rounds, matches and games.",
+  },
+  {
+    icon: "🏆",
+    title: "Track Your Record",
+    body: "Every win and loss on your public profile. Your reputation is on the line.",
+  },
+  {
+    icon: "💸",
+    title: "No Middleman",
+    body: "Ratpac never touches your money. Losers pay winners directly.",
+  },
+];
+
 function calculateAge(day: number, month: number, year: number): number {
   const today = new Date();
   const birth = new Date(year, month - 1, day);
@@ -27,6 +45,9 @@ function calculateAge(day: number, month: number, year: number): number {
 }
 
 export default function OnboardingScreen() {
+  const [showIntro, setShowIntro] = useState(true);
+  const [slideIndex, setSlideIndex] = useState(0);
+
   const draft = useAppStore((s) => s.onboardingDraft);
   const setDraftHandle = useAppStore((s) => s.setDraftHandle);
   const setDraftPrivacy = useAppStore((s) => s.setDraftPrivacy);
@@ -98,6 +119,50 @@ export default function OnboardingScreen() {
       if (!result.ok) return;
     }
     completeOnboarding();
+  }
+
+  if (showIntro) {
+    const slide = INTRO_SLIDES[slideIndex];
+    const isLast = slideIndex === INTRO_SLIDES.length - 1;
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={introStyles.wrap}>
+          <Image
+            source={require("../../assets/ratpac-logo.png")}
+            style={introStyles.logo}
+            resizeMode="contain"
+          />
+          <Text style={introStyles.slideIcon}>{slide.icon}</Text>
+          <Text style={introStyles.slideTitle}>{slide.title}</Text>
+          <Text style={introStyles.slideBody}>{slide.body}</Text>
+          <View style={introStyles.dots}>
+            {INTRO_SLIDES.map((_, i) => (
+              <View
+                key={i}
+                style={[introStyles.dot, i === slideIndex && introStyles.dotActive]}
+              />
+            ))}
+          </View>
+          <Pressable
+            style={introStyles.btn}
+            onPress={() => {
+              if (isLast) {
+                setShowIntro(false);
+              } else {
+                setSlideIndex((n) => n + 1);
+              }
+            }}
+          >
+            <Text style={introStyles.btnText}>{isLast ? "Get Started" : "Next"}</Text>
+          </Pressable>
+          {!isLast && (
+            <Pressable onPress={() => setShowIntro(false)}>
+              <Text style={introStyles.skip}>Skip</Text>
+            </Pressable>
+          )}
+        </View>
+      </SafeAreaView>
+    );
   }
 
   return (
@@ -605,5 +670,73 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontWeight: "800",
     fontSize: 16,
+  },
+});
+
+const introStyles = StyleSheet.create({
+  wrap: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 32,
+    gap: 16,
+    backgroundColor: theme.colors.bgPrimary,
+  },
+  logo: {
+    width: 140,
+    height: 35,
+    marginBottom: 24,
+  },
+  slideIcon: {
+    fontSize: 64,
+    marginBottom: 8,
+  },
+  slideTitle: {
+    color: theme.colors.textPrimary,
+    fontSize: 28,
+    fontWeight: "800",
+    textAlign: "center",
+  },
+  slideBody: {
+    color: theme.colors.textSecondary,
+    fontSize: 16,
+    textAlign: "center",
+    lineHeight: 24,
+    marginBottom: 8,
+  },
+  dots: {
+    flexDirection: "row",
+    gap: 8,
+    marginVertical: 8,
+  },
+  dot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: theme.colors.border,
+  },
+  dotActive: {
+    backgroundColor: theme.colors.accent,
+    width: 24,
+  },
+  btn: {
+    backgroundColor: theme.colors.accent,
+    borderRadius: 14,
+    paddingVertical: 16,
+    paddingHorizontal: 48,
+    alignItems: "center",
+    width: "100%",
+    marginTop: 8,
+  },
+  btnText: {
+    color: "#001B10",
+    fontWeight: "800",
+    fontSize: 16,
+  },
+  skip: {
+    color: theme.colors.textMuted,
+    fontSize: 14,
+    fontWeight: "500",
+    paddingVertical: 8,
   },
 });

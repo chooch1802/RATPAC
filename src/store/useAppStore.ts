@@ -85,6 +85,7 @@ type AppState = {
   settlementAlertsEnabled: boolean;
   groups: Group[];
   createWagerContext: { parentWagerId?: string; groupId?: string } | null;
+  pendingGroupJoinCode: string | null;
 
   setAuth: (next: boolean) => void;
   setNotificationsEnabled: (next: boolean) => void;
@@ -125,6 +126,7 @@ type AppState = {
   leaveGroup: (groupId: string) => Promise<{ ok: boolean; message: string }>;
   upsertGroup: (group: Group) => void;
   markAsPaid: (wagerId: string) => Promise<void>;
+  setPendingGroupJoinCode: (code: string | null) => void;
 };
 
 export const useAppStore = create<AppState>((set, get) => ({
@@ -164,6 +166,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   settlementAlertsEnabled: true,
   groups: [],
   createWagerContext: null,
+  pendingGroupJoinCode: null,
 
   setAuth: (next) => set({ isAuthed: next }),
 
@@ -643,4 +646,6 @@ export const useAppStore = create<AppState>((set, get) => ({
           : s.groups.map((g) => (g.id === group.id ? { ...g, ...group } : g));
       return { groups };
     }),
+
+  setPendingGroupJoinCode: (code) => set({ pendingGroupJoinCode: code }),
 }));

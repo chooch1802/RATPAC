@@ -2,8 +2,9 @@ import { DefaultTheme, NavigationContainer } from "@react-navigation/native";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { StatusBar } from "expo-status-bar";
-import { useEffect } from "react";
-import { Image, StyleSheet, Text, View } from "react-native";
+import React, { useEffect, useRef } from "react";
+import { Image, Linking, StyleSheet, Text, View } from "react-native";
+import { NavigationContainerRef } from "@react-navigation/native";
 
 import { CreateWagerModal } from "./src/components/CreateWagerModal";
 import { CustomTabBar } from "./src/components/CustomTabBar";
@@ -38,6 +39,16 @@ import { theme } from "./src/theme";
 
 // Initialise RevenueCat once at module load
 initRevenueCat();
+
+const navigationRef = React.createRef<NavigationContainerRef<any>>();
+
+function parseDeepLink(url: string): { type: "wager"; wagerId: string } | { type: "group_join"; code: string } | null {
+  const wagerMatch = url.match(/^ratpac:\/\/wager[?&]id=([^&]+)/);
+  if (wagerMatch) return { type: "wager", wagerId: decodeURIComponent(wagerMatch[1]) };
+  const groupMatch = url.match(/^ratpac:\/\/group\/join[?&]code=([^&]+)/);
+  if (groupMatch) return { type: "group_join", code: decodeURIComponent(groupMatch[1]) };
+  return null;
+}
 
 const RootStack = createNativeStackNavigator();
 const AppStack = createNativeStackNavigator();
@@ -274,8 +285,45 @@ export default function App() {
     };
   }, [isAuthed, patchFeedPost]);
 
+  const pendingLinkRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    function process(url: string | null) {
+      if (!url) return;
+      const parsed = parseDeepLink(url);
+      if (!parsed) return;
+      if (!isAuthed) {
+        pendingLinkRef.current = url;
+        return;
+      }
+      if (parsed.type === "wager") {
+        (navigationRef.current as any)?.navigate("WagerDetail", { wagerId: parsed.wagerId });
+      } else if (parsed.type === "group_join") {
+        useAppStore.getState().setPendingGroupJoinCode(parsed.code);
+      }
+    }
+
+    Linking.getInitialURL().then(process);
+    const sub = Linking.addEventListener("url", ({ url }) => process(url));
+    return () => sub.remove();
+  }, [isAuthed]);
+
+  // Process any link that arrived before auth was ready
+  useEffect(() => {
+    if (!isAuthed || !pendingLinkRef.current) return;
+    const url = pendingLinkRef.current;
+    pendingLinkRef.current = null;
+    const parsed = parseDeepLink(url);
+    if (!parsed) return;
+    if (parsed.type === "wager") {
+      (navigationRef.current as any)?.navigate("WagerDetail", { wagerId: parsed.wagerId });
+    } else if (parsed.type === "group_join") {
+      useAppStore.getState().setPendingGroupJoinCode(parsed.code);
+    }
+  }, [isAuthed]);
+
   return (
-    <NavigationContainer theme={navTheme}>
+    <NavigationContainer ref={navigationRef} theme={navTheme}>
       <StatusBar style="light" />
       {isLoading ? <SplashScreen /> : <RootFlow />}
       <PaywallModal />

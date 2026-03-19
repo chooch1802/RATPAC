@@ -57,6 +57,8 @@ export default function GroupsScreen({ navigation }: { navigation: any }) {
   const loadGroups = useAppStore((s) => s.loadGroups);
   const createGroup = useAppStore((s) => s.createGroup);
   const joinGroup = useAppStore((s) => s.joinGroup);
+  const pendingGroupJoinCode = useAppStore((s) => s.pendingGroupJoinCode);
+  const setPendingGroupJoinCode = useAppStore((s) => s.setPendingGroupJoinCode);
 
   const [isLoading, setIsLoading] = useState(false);
   const [showCreate, setShowCreate] = useState(false);
@@ -71,6 +73,14 @@ export default function GroupsScreen({ navigation }: { navigation: any }) {
     setIsLoading(true);
     loadGroups().finally(() => setIsLoading(false));
   }, []);
+
+  useEffect(() => {
+    if (!pendingGroupJoinCode) return;
+    setJoinCode(pendingGroupJoinCode);
+    setErrorMsg("");
+    setShowJoin(true);
+    setPendingGroupJoinCode(null);
+  }, [pendingGroupJoinCode]);
 
   function openCreate() {
     setNewGroupName("");
