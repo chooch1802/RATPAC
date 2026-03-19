@@ -9,9 +9,10 @@ import {
   TextInput,
   View,
 } from "react-native";
+import { QRShareModal } from "./QRShareModal";
 import { useAppStore } from "../store/useAppStore";
 import { theme } from "../theme";
-import { Group, PaymentMethod } from "../types";
+import { Group, PaymentMethod, Wager } from "../types";
 
 const PAYMENT_METHODS: { id: PaymentMethod; icon: string; hint: string }[] = [
   { id: "Venmo", icon: "💙", hint: "🇺🇸" },
@@ -145,6 +146,7 @@ export function CreateWagerModal() {
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("Venmo");
   const [paymentHandle, setPaymentHandle] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [pendingWager, setPendingWager] = useState<Wager | null>(null);
 
   // Read context from store when modal opens
   useEffect(() => {
@@ -188,11 +190,15 @@ export function CreateWagerModal() {
         ? `${selectedSport.name} — ${selectedBetType.name}`
         : selectedSport.name;
 
+    const normalizedOpponent = opponent.trim().startsWith("@")
+      ? opponent.trim()
+      : `@${opponent.trim()}`;
+
     try {
-      await createWager({
+      const wager = await createWager({
         activity: activityName,
         amount: parseFloat(amount) || 0,
-        opponentHandle: opponent.trim(),
+        opponentHandle: normalizedOpponent,
         termsText: termsText.trim(),
         isPublic,
         paymentMethod,
@@ -202,11 +208,11 @@ export function CreateWagerModal() {
         groupId: selectedGroupId ?? undefined,
         parentWagerId: createWagerContext?.parentWagerId ?? undefined,
       });
+      if (wager) setPendingWager(wager);
     } catch {
       // error handled by store
     }
     setIsSubmitting(false);
-    reset();
     setCreateWagerContext(null);
   }
 
@@ -229,11 +235,27 @@ export function CreateWagerModal() {
     }
   }
 
+  const normalizedOpponentForQR = opponent.trim().startsWith("@")
+    ? opponent.trim()
+    : `@${opponent.trim()}`;
+
   return (
+    <>
+    {/* QR shown after wager is sent — outside the main modal */}
+    {pendingWager && (
+      <QRShareModal
+        visible={!!pendingWager}
+        onClose={() => { setPendingWager(null); reset(); }}
+        qrValue={`ratpac://wager?id=${pendingWager.id}`}
+        title="Challenge sent!"
+        subtitle={`Scan to view the wager vs ${normalizedOpponentForQR}`}
+        shareMessage={`I've challenged you on Ratpac!\n\n${pendingWager.activity} — $${pendingWager.amount.toFixed(2)}\n\nOpen Ratpac to accept: ratpac://wager?id=${pendingWager.id}`}
+      />
+    )}
     <Modal
       animationType="slide"
       transparent
-      visible={showCreateWager}
+      visible={showCreateWager && !pendingWager}
       onRequestClose={close}
     >
       <Pressable style={styles.backdrop} onPress={close}>
@@ -622,6 +644,7 @@ export function CreateWagerModal() {
         </Pressable>
       </Pressable>
     </Modal>
+  </>
   );
 }
 

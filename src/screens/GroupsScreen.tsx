@@ -10,6 +10,7 @@ import {
   View,
   Modal,
 } from "react-native";
+import { QRShareModal } from "../components/QRShareModal";
 import { useAppStore } from "../store/useAppStore";
 import { theme } from "../theme";
 import { Group } from "../types";
@@ -25,15 +26,15 @@ function getInitials(name: string): string {
 function GroupCard({
   group,
   onPress,
+  onShare,
 }: {
   group: Group;
   onPress: () => void;
+  onShare: () => void;
 }) {
   return (
     <Pressable style={styles.groupCard} onPress={onPress}>
-      <View
-        style={[styles.groupAvatar, { backgroundColor: group.avatarColor }]}
-      >
+      <View style={[styles.groupAvatar, { backgroundColor: group.avatarColor }]}>
         <Text style={styles.groupAvatarText}>{getInitials(group.name)}</Text>
       </View>
       <View style={styles.groupCardBody}>
@@ -44,11 +45,9 @@ function GroupCard({
           <Text style={styles.groupCode}>{group.joinCode}</Text>
         </Text>
       </View>
-      <View style={styles.groupRoleBadge}>
-        <Text style={styles.groupRoleText}>
-          {group.myRole === "admin" ? "Admin" : "Member"}
-        </Text>
-      </View>
+      <Pressable style={styles.shareIconBtn} onPress={(e) => { e.stopPropagation?.(); onShare(); }}>
+        <Text style={styles.shareIconText}>⇪</Text>
+      </Pressable>
     </Pressable>
   );
 }
@@ -66,6 +65,7 @@ export default function GroupsScreen({ navigation }: { navigation: any }) {
   const [joinCode, setJoinCode] = useState("");
   const [actionLoading, setActionLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
+  const [qrGroup, setQrGroup] = useState<Group | null>(null);
 
   useEffect(() => {
     setIsLoading(true);
@@ -92,6 +92,7 @@ export default function GroupsScreen({ navigation }: { navigation: any }) {
     setActionLoading(false);
     if (group) {
       setShowCreate(false);
+      setQrGroup(group);
     } else {
       setErrorMsg("Failed to create group. Please try again.");
     }
@@ -153,9 +154,8 @@ export default function GroupsScreen({ navigation }: { navigation: any }) {
             <GroupCard
               key={group.id}
               group={group}
-              onPress={() =>
-                navigation.navigate("GroupDetail", { groupId: group.id })
-              }
+              onPress={() => navigation.navigate("GroupDetail", { groupId: group.id })}
+              onShare={() => setQrGroup(group)}
             />
           ))}
         </ScrollView>
@@ -204,6 +204,18 @@ export default function GroupsScreen({ navigation }: { navigation: any }) {
           </Pressable>
         </Pressable>
       </Modal>
+
+      {/* QR Share Modal */}
+      <QRShareModal
+        visible={!!qrGroup}
+        onClose={() => setQrGroup(null)}
+        qrValue={qrGroup ? `ratpac://group/join?code=${qrGroup.joinCode}` : "ratpac://"}
+        title={qrGroup?.name ?? ""}
+        subtitle="Scan to join this group in Ratpac"
+        code={qrGroup?.joinCode}
+        codeLabel="Group code"
+        shareMessage={qrGroup ? `Join my Ratpac group "${qrGroup.name}"!\n\nOpen Ratpac and enter code: ${qrGroup.joinCode}\n\nratpac://group/join?code=${qrGroup.joinCode}` : ""}
+      />
 
       {/* Join Group Modal */}
       <Modal
@@ -350,18 +362,21 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     letterSpacing: 1,
   },
-  groupRoleBadge: {
+  shareIconBtn: {
+    width: 34,
+    height: 34,
+    borderRadius: 10,
     backgroundColor: theme.colors.bgTertiary,
     borderWidth: 1,
     borderColor: theme.colors.border,
-    borderRadius: 8,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
+    alignItems: "center",
+    justifyContent: "center",
+    flexShrink: 0,
   },
-  groupRoleText: {
-    color: theme.colors.textMuted,
-    fontSize: 11,
-    fontWeight: "600",
+  shareIconText: {
+    color: theme.colors.textSecondary,
+    fontSize: 16,
+    fontWeight: "700",
   },
   // Empty state
   emptyState: {

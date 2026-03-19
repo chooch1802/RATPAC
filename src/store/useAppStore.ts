@@ -101,7 +101,7 @@ type AppState = {
   setPaywallVisible: (next: boolean, trigger?: string) => void;
   setCreateWagerVisible: (next: boolean) => void;
   setCreateWagerContext: (ctx: { parentWagerId?: string; groupId?: string } | null) => void;
-  createWager: (payload: CreateWagerPayload) => Promise<void>;
+  createWager: (payload: CreateWagerPayload) => Promise<Wager | null>;
   markWagerSettled: (wagerId: string, winnerHandle: string) => Promise<void>;
   declareResult: (wagerId: string, winnerHandle: string) => Promise<void>;
   confirmResult: (wagerId: string) => Promise<void>;
@@ -232,7 +232,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     const state = get();
     if (!isProUser(state.user) && state.user.activeWagerCount >= 3) {
       set({ showPaywall: true, paywallTrigger: "wager_limit" });
-      return;
+      return null;
     }
 
     // Responsible gambling check
@@ -294,6 +294,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         activeWagerCount: curr.user.activeWagerCount + 1,
       },
     }));
+    return newWager;
   },
 
   markWagerSettled: async (wagerId, winnerHandle) => {
