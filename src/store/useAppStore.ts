@@ -233,10 +233,6 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   createWager: async ({ activity, amount, opponentHandle, termsText, isPublic, paymentMethod, paymentHandle, sport, betType, groupId, parentWagerId }) => {
     const state = get();
-    if (!isProUser(state.user) && state.user.activeWagerCount >= 3) {
-      set({ showPaywall: true, paywallTrigger: "wager_limit" });
-      return null;
-    }
 
     // Responsible gambling check
     if (state.gamblingSettings) {
@@ -592,11 +588,6 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   createGroup: async (name) => {
-    const state = get();
-    if (!isProUser(state.user)) {
-      set({ showPaywall: true, paywallTrigger: "group_create" });
-      return null;
-    }
     const group = await createGroupService(name);
     if (group) {
       set((s) => ({ groups: [group, ...s.groups] }));

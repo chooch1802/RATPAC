@@ -8,7 +8,6 @@ import { NavigationContainerRef } from "@react-navigation/native";
 
 import { CreateWagerModal } from "./src/components/CreateWagerModal";
 import { CustomTabBar } from "./src/components/CustomTabBar";
-import { PaywallModal } from "./src/components/PaywallModal";
 
 import FeedScreen from "./src/screens/FeedScreen";
 import GroupDetailScreen from "./src/screens/GroupDetailScreen";
@@ -23,6 +22,7 @@ import SignInScreen from "./src/screens/SignInScreen";
 import EditProfileScreen from "./src/screens/EditProfileScreen";
 import GamblingControlsScreen from "./src/screens/GamblingControlsScreen";
 import UserProfileScreen from "./src/screens/UserProfileScreen";
+import SubscriptionWallScreen from "./src/screens/SubscriptionWallScreen";
 import WagerDetailScreen from "./src/screens/WagerDetailScreen";
 import WagersScreen from "./src/screens/WagersScreen";
 
@@ -158,6 +158,15 @@ function AppNavigator() {
 function RootFlow() {
   const isAuthed = useAppStore((s) => s.isAuthed);
   const isOnboarded = useAppStore((s) => s.isOnboarded);
+  const user = useAppStore((s) => s.user);
+
+  // isProUser is intentionally re-evaluated here so the nav tree reacts to
+  // subscription / trial changes without a full app remount.
+  function isPro(): boolean {
+    if (user.isSubscribed) return true;
+    if (!user.trialEndsAt) return false;
+    return new Date(user.trialEndsAt) > new Date();
+  }
 
   return (
     <RootStack.Navigator screenOptions={{ headerShown: false }}>
@@ -165,6 +174,8 @@ function RootFlow() {
         <RootStack.Screen name="SignIn" component={SignInScreen} />
       ) : !isOnboarded ? (
         <RootStack.Screen name="Onboarding" component={OnboardingScreen} />
+      ) : !isPro() ? (
+        <RootStack.Screen name="SubscriptionWall" component={SubscriptionWallScreen} />
       ) : (
         <RootStack.Screen name="App" component={AppNavigator} />
       )}
@@ -326,7 +337,6 @@ export default function App() {
     <NavigationContainer ref={navigationRef} theme={navTheme}>
       <StatusBar style="light" />
       {isLoading ? <SplashScreen /> : <RootFlow />}
-      <PaywallModal />
       <CreateWagerModal />
     </NavigationContainer>
   );

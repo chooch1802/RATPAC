@@ -16,7 +16,7 @@ import {
   View,
 } from "react-native";
 import { fetchSideBets, fetchWagerById, fetchComments, addComment } from "../services/wagers";
-import { isProUser, useAppStore } from "../store/useAppStore";
+import { useAppStore } from "../store/useAppStore";
 import { theme } from "../theme";
 import { PaymentMethod, Wager, WagerComment, WagerStatus } from "../types";
 
@@ -163,7 +163,6 @@ export default function WagerDetailScreen({
   const disputeResult = useAppStore((s) => s.disputeResult);
   const setCreateWagerVisible = useAppStore((s) => s.setCreateWagerVisible);
   const setCreateWagerContext = useAppStore((s) => s.setCreateWagerContext);
-  const setPaywallVisible = useAppStore((s) => s.setPaywallVisible);
   const markAsPaid = useAppStore((s) => s.markAsPaid);
 
   function handleReport() {
@@ -645,10 +644,6 @@ export default function WagerDetailScreen({
               <Pressable
                 style={styles.sideBetAddBtn}
                 onPress={() => {
-                  if (!isProUser(user)) {
-                    setPaywallVisible(true, "side_bet");
-                    return;
-                  }
                   setCreateWagerContext({
                     parentWagerId: wager.id,
                     groupId: wager.groupId,
